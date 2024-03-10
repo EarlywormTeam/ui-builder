@@ -6,9 +6,8 @@ import { DynamicProvider } from "./DynamicProvider";
 
 export function DynamicElement({id, draggable, droppable, mode}: {id: string, draggable: boolean, droppable: boolean, mode?: 'preview' | 'editing'}) {
   
-  const state = useSelector((state: RootState) => state.canvas);
-  const config: ComponentConfig | ProviderConfig = state.configMap[id];
-  const childrenIds: Array<string> = state.childrenMap[id] || [];
+  const config: ComponentConfig | ProviderConfig = useSelector((state: RootState) => state.canvas.configMap[id]);
+  const childrenIds: Array<string> = useSelector((state: RootState) => state.canvas.childrenMap[id]) || [];
 
   if (!config) {
     return null;
@@ -26,9 +25,7 @@ export function DynamicElement({id, draggable, droppable, mode}: {id: string, dr
   } else {
     // This is a ComponentConfig
     return (
-      <DynamicComponent id={id} config={config as ComponentConfig} childrenIds={childrenIds} draggable={draggable} droppable={droppable} mode={mode}>
-        
-      </DynamicComponent>
+      <DynamicComponent id={id} config={config as ComponentConfig} childrenIds={childrenIds} draggable={draggable} droppable={droppable} mode={mode}/>
     );
   }
 }

@@ -1,31 +1,34 @@
 import { createContext } from 'react';
-import { PayloadAction, createSlice, current } from '@reduxjs/toolkit';
+import { PayloadAction, createSlice } from '@reduxjs/toolkit';
 import { ComponentConfig, ProviderConfig } from '../../pages/app/components/ir/good/config';
 import { Context } from 'react';
 
 export const contextMap: Record<string, Context<any>> = {};
 
 export interface CanvasState {
+  projectDescription: string | null;
   configMap: Record<string, ComponentConfig | ProviderConfig>;
   childrenMap: Record<string, string[]>;
   parentMap: Record<string, string>;
+  selectedIds: Array<string>;
   magicWiringLoading: boolean;
+  magicPaintingLoading: boolean;
 }
 
 const defaultConfigMap: Record<string, ComponentConfig | ProviderConfig> = {
   rowLayout: {
-    type: 'row',
+    type: 'div',
     attributes: { className: 'flex w-full flex-grow bg-blue-100' },
     events: [],
   },
   colLayout: {
-    type: 'col',
+    type: 'div',
     attributes: { className: 'flex flex-col w-full h-full flex-grow bg-green-100' },
     events: [],
   },
   label: {
     type: 'label',
-    attributes:  { className: 'inline', textContent: 'Label'},
+    attributes:  { className: 'inline', textContent: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit'},
     events: [],
   },
   button: {
@@ -33,36 +36,74 @@ const defaultConfigMap: Record<string, ComponentConfig | ProviderConfig> = {
     attributes:  {className: 'flex w-full', textContent: 'Button'},
     events: [],
   },
+  input: {
+    type: 'input',
+    attributes: { className: 'w-full h-8 bg-gray-100', defaultValue: 'Type here...'},
+    events: [],
+  },
+  textArea: {
+    type: 'textarea',
+    attributes: { className: 'w-full h-24 bg-gray-100', defaultValue: 'Type here...'},
+    events: [],
+  },
   rowLayout__demo: {
-    type: 'row',
+    type: 'div',
     attributes: {className: 'flex w-full', textContent: 'Row Layout'},
     events: [],
   },
   colLayout__demo: {
-    type: 'col',
+    type: 'div',
     attributes:  { className: 'flex w-full', textContent: 'Column Layout'},
+    events: [],
+  },
+  label__demo: {
+    type: 'label',
+    attributes:  { className: 'inline', textContent: 'Label'},
+    events: [],
+  },
+  button__demo: {
+    type: 'button',
+    attributes:  {className: 'flex w-full', textContent: 'Button'},
+    events: [],
+  },
+  input__demo: {
+    type: 'input',
+    attributes: { className: 'w-full h-8 bg-gray-100', defaultValue: 'Text Input'},
+    events: [],
+  },
+  textArea__demo: {
+    type: 'textarea',
+    attributes: { className: 'w-full h-24 bg-gray-100', defaultValue: 'Text Area'},
     events: [],
   },
 }
 
 const initialState: CanvasState = {
+  projectDescription: null,
   configMap: defaultConfigMap,
   childrenMap: {} as Record<string, string[]>,
   parentMap: {} as Record<string, string>,
+  selectedIds: [] as Array<string>,
   magicWiringLoading: false,
+  magicPaintingLoading: false
 };
 
-const removeId = (id: string, state: CanvasState) => {
-  if (state.childrenMap[id]) {
-    state.childrenMap[id].forEach(childId => removeId(childId, state));
-  }
+const _removeId = (id: string, state: CanvasState) => {
   const parentId = state.parentMap[id];
   if (parentId) {
     state.childrenMap[parentId] = state.childrenMap[parentId].filter(childId => childId !== id);
     delete state.parentMap[id];
+  } 
+}
+
+const _deleteId = (id: string, state: CanvasState) => {
+  if (state.childrenMap[id]) {
+    state.childrenMap[id].forEach(childId => _deleteId(childId, state));
   }
+  _removeId(id, state);
   delete state.configMap[id];
   delete contextMap[id];
+  state.selectedIds = state.selectedIds.filter((sid: string) => sid !== id);
 }
 
 const insertId = (id: string, parentId: string, index: number | null, state: CanvasState) => {
@@ -94,47 +135,59 @@ const canvasSlice = createSlice({
       const { id, parentId, index } = action.payload;
       insertId(id, parentId, index, state);
     },
-    remove: (state, action: PayloadAction<{ id: string }>) => {
+    deleteId: (state, action: PayloadAction<{ id: string }>) => {
       const { id } = action.payload;
-      removeId(id, state);
+      _deleteId(id, state);
+    },
+    deleteSelected: (state) => {
+      state.selectedIds.forEach(id => {
+        _deleteId(id, state);
+      });
+    },
+    removeId: (state, action: PayloadAction<{ id: string }>) => {
+      const { id } = action.payload;
+      _removeId(id, state);
     },
     doMagicWiring: (state) => {
       state.magicWiringLoading = true;
     },
+    doMagicPaint: (state) => {
+      state.magicPaintingLoading = true;
+    },
     setNewConfigTree: (state, action: PayloadAction<{ configTree: any }>) => {
       const {configTree} = action.payload;
-      let stateCopy = JSON.parse(JSON.stringify(current(state)));
       const updateTree = (node: any, parentId: string = 'canvas', depth=0) => {
         if (node.id !== 'canvas') {
           console.log('updateTree', node.id, node.config?.type || node.config?.name, depth, Array.isArray(node.children) ? node.children.length : 0);
           
-          const existingConfig = stateCopy.configMap[node.id];
+          const existingConfig = state.configMap[node.id];
 
-          let removed = false;
-          const existingParentId = stateCopy.parentMap[node.id];
+          const existingParentId = state.parentMap[node.id];
           if (parentId !== existingParentId) {
             if (existingParentId) {
-              removeId(node.id, stateCopy);
-              removed = true;
+              _removeId(node.id, state);
             }
           }
 
           const needsUpdate = !existingConfig || JSON.stringify(existingConfig) !== JSON.stringify(node.config);
-          if (removed || needsUpdate) {
-            stateCopy.configMap[node.id] = node.config;
+          if (needsUpdate) {
+            state.configMap[node.id] = node.config;
           }
 
           if (parentId !== existingParentId) {
-            insertId(node.id, parentId, null, stateCopy);
+            insertId(node.id, parentId, null, state);
           }
         }
         
-        const oldChildrenIds = stateCopy.childrenMap[node.id] || [];
+        const oldChildrenIds = state.childrenMap[node.id] || [];
+        if (!node.children) {
+          node.children = [];
+        }
         const newChildrenIds = node.children.map((child: any) => child.id);
 
         for (const oldChildId of oldChildrenIds) {
           if (!newChildrenIds.includes(oldChildId)) {
-            removeId(oldChildId, stateCopy);
+            _deleteId(oldChildId, state);
           }
         }
 
@@ -143,12 +196,25 @@ const canvasSlice = createSlice({
         }
       }
       updateTree(configTree);
-      stateCopy.magicWiringLoading = false;
-      return {...stateCopy};
+      state.magicWiringLoading = false;
+      state.magicPaintingLoading = false;
+    },
+    genStarterTemplate: (state, action: PayloadAction<{ projectDescription: string }>) => {
+      const { projectDescription } = action.payload;
+      state.projectDescription = projectDescription;
+    },
+    setSelectedIds: (state, action: PayloadAction<Array<string>>) => {
+      state.selectedIds = action.payload;
+    },
+    addSelectedId: (state, action: PayloadAction<string>) => {
+      state.selectedIds.push(action.payload);
+    },
+    removeSelectedId: (state, action: PayloadAction<string>) => {
+      state.selectedIds = state.selectedIds.filter(id => id !== action.payload);
     }
   },
 });
 
-export const { add, insertChild, remove, doMagicWiring, setNewConfigTree } = canvasSlice.actions;
+export const { add, insertChild, removeId, doMagicWiring, doMagicPaint, setNewConfigTree, genStarterTemplate, setSelectedIds, deleteSelected, deleteId, addSelectedId, removeSelectedId } = canvasSlice.actions;
 
 export default canvasSlice.reducer;

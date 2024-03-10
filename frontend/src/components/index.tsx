@@ -1,2 +1,1 @@
-export { default as RowLayout } from './rowLayout';
-export { default as ColLayout } from './colLayout';
+export { default as Div } from './div';

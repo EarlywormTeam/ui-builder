@@ -21,3 +21,9 @@ export interface ProviderConfig {
   actions: Array<{name: string, payload: any, reducerCode: string}>,
   initialState: any,
 }
+
+export interface ConfigTree {
+  id: string
+  config: ComponentConfig | ProviderConfig
+  children: ConfigTree[]
+}

@@ -4,7 +4,7 @@ interface ColLayoutProps extends React.HTMLAttributes<HTMLDivElement> {
   id: string;
 }
 
-const ColLayout = React.forwardRef<HTMLDivElement, React.PropsWithChildren<ColLayoutProps>>(({ children, id, ...rest }, ref) => {
+const Div = React.forwardRef<HTMLDivElement, React.PropsWithChildren<ColLayoutProps>>(({ children, id, ...rest }, ref) => {
 
   const { className, ...otherProps } = rest;
   return (
@@ -14,5 +14,5 @@ const ColLayout = React.forwardRef<HTMLDivElement, React.PropsWithChildren<ColLa
   );
 });
 
-export default ColLayout;
+export default Div;
 

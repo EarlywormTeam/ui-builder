@@ -16,7 +16,7 @@ const withDroppable = (Component: React.ElementType) => {
     };
 
     // Pass the combinedRef as a ref prop to the Component
-    return <Component ref={combinedRef} {...props} />;
+    return <Component id={id} ref={combinedRef} {...props} />;
   });
 };
 

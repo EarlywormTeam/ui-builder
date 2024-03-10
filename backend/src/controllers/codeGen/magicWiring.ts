@@ -1,17 +1,12 @@
 import { Context } from 'koa';
-import * as LLM from '../services/llm';
-import { ComponentConfig, ProviderConfig } from '../types/config';
-
-interface ConfigTree {
-  id: string
-  config: ComponentConfig | ProviderConfig
-  children: ConfigTree[]
-}
+import * as LLM from '../../services/llm';
+import { ConfigTree} from '../../types/config';
 
 export const doMagicWiring = async (ctx: Context) => {
   const { configTree } = ctx.request.body as {configTree: ConfigTree};
   const messages: LLM.LlmMessage[] = [{role: "system", content: magicWiringSystemPrompt}, {role: "user", content: JSON.stringify(magicWiringExampleOne)}, {role: "assistant", content: JSON.stringify(magicWiringSolutionOne)}, {role: "user", content: JSON.stringify(configTree)}];
-  const resMessage = await LLM.queryLlmWithJsonValidation(messages, (json) => true);
+  const resMessage = await LLM.queryLlmWithJsonValidation(messages, (json) => true, 'gpt-3.5-turbo-0125', 0.2);
+  console.log(JSON.stringify(JSON.parse(resMessage.content), null, 2));
   ctx.body = {configTree: JSON.parse(resMessage.content)};
 }
 

@@ -1,21 +1,17 @@
 import React from 'react';
 import { useDraggable } from '@dnd-kit/core';
-import { CSS } from '@dnd-kit/utilities';
 
 const withDraggable = (Component: React.ElementType) => {
   return ({ id, ...props }: any) => {
-    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id });
-    const adjTransform = transform ? { ...transform, scaleX: 1, scaleY: 1} : transform;
+    const { isDragging, attributes, listeners, setNodeRef } = useDraggable({ id });
     const mergedStyle = {
       ...props.style,
-      transform: CSS.Transform.toString(adjTransform),
-      zIndex: 1000, // Ensure the draggable component appears above other content
+      opacity: isDragging ? 0.5 : 1, // Make the component 50% opaque
     };
-    console.log(adjTransform);
 
     // Pass the setNodeRef, attributes, and listeners through props to the Component
     return (
-      <Component ref={setNodeRef} style={mergedStyle} {...attributes} {...listeners} {...props} />
+      <Component id={id} ref={setNodeRef} style={mergedStyle} {...attributes} {...listeners} {...props} />
     );
   };
 };

@@ -1,42 +1,113 @@
-import React, { PropsWithChildren, useEffect, useState } from "react";
-import { useDispatch } from "react-redux";
+import React, { PropsWithChildren, useEffect, useRef, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { ComponentConfig, ProviderDependencyConfig } from "./config";
 import { DynamicContextConsumer } from "./DynamicContextConsumer";
 import { useComponent } from './useComponent';
 import withDraggable from "../../DraggableComponent";
 import withDroppable from "../../DroppableComponent";
 import { DynamicElement } from "./DynamicElement";
-import { add } from 'src/redux/slice/canvasSlice';
+import { add, addSelectedId, setSelectedIds } from 'src/redux/slice/canvasSlice';
+import { RootState } from "src/redux/store";
 
-interface EventDefinition {
-  args: string[],
-  calls: {contextId: string, body: string}[]
+const useIsSelected = (id: string) => {
+  const selectedIds = useSelector((state: RootState) => state.canvas.selectedIds);
+  return selectedIds.includes(id);
 }
 
-type ConvertedHandlers = Record<string, (...args: any[]) => any>;
+const extractContextIdsFromEvents = (events: { actions: { contextId: string }[] }[]) => {
+  return [...new Set(events
+    .map(e => e.actions.map(a => a.contextId))
+    .flat())]; // Flatten and then remove duplicates using Set
+}
+
+const extractContextIdsFromAttributes = (attributes: Record<string, ProviderDependencyConfig | string>) => {
+  return Object.values(attributes)
+    .filter((a): a is ProviderDependencyConfig => typeof a !== 'string')
+    .map(a => a.contextId);
+}
+
+// attributes can be either a string or a ProviderDependencyConfig.
+// If they are a ProviderDependencyConfig, we can use the context to
+// get the value.
+const resolveAttributes = (attributes: Record<string, ProviderDependencyConfig | string>, contexts: Record<string, any>): Record<string, string> => {
+  return Object.keys(attributes).reduce((acc: Record<string, string>, key: string) => {
+    const value = attributes[key];
+    if (typeof value === 'string') {
+      acc[key] = value;
+    } else {
+      acc[key] = convertProviderDependencyConfigToString(contexts, value);
+    }
+    return acc;
+  }, {});
+}
+
+interface EventConfig {
+  name: string;
+  actions: ActionConfig[];
+}
+
+interface ActionConfig {
+  contextId: string;
+  actionName: string;
+  actionPayload?: string;
+}
+
+interface Contexts {
+  [key: string]: {
+    dispatch: (action: { type: string; payload?: any }) => void;
+  };
+}
+
+const convertEventHandlers = (
+  events: EventConfig[],
+  contexts: Contexts
+): Record<string, React.MouseEventHandler<HTMLElement>> => {
+  let convertedHandlers: Record<string, React.MouseEventHandler<HTMLElement>> = {};
+  events.forEach((configEvent: EventConfig) => {
+    convertedHandlers[configEvent.name] = ((contexts: Contexts) => {
+      return (event: React.MouseEvent<HTMLElement, MouseEvent>) => {
+        console.log('event', event);
+        configEvent.actions.forEach((action: ActionConfig) => {
+          if (contexts[action.contextId] && typeof contexts[action.contextId].dispatch === 'function') {
+            contexts[action.contextId].dispatch({
+              type: action.actionName,
+              payload: action.actionPayload ? JSON.parse(action.actionPayload) : null,
+            });
+          } else {
+            console.error(`Context with id ${action.contextId} not found or dispatch not a function`);
+          }
+        });
+      };
+    })(contexts);
+  });
+
+  return convertedHandlers;
+};
 
 export const DynamicComponent: React.FC<PropsWithChildren<{id: string, config: ComponentConfig, childrenIds: string[], draggable: boolean, droppable: boolean, mode?: 'preview' | 'editing'} & React.HTMLAttributes<HTMLElement>>> = ({id, config, childrenIds, draggable, droppable, children, mode, ...props}) => {
   const displayMode = mode || 'preview';
   const dispatch = useDispatch();
   const [isEditing, setIsEditing] = useState(false);
-  const [editContent, setEditContent] = useState(config.attributes.textContent || '');
+  const [editContent, setEditContent] = useState(config.attributes.textContent) || '';
+  const isSelected = useIsSelected(id);
+  const [localIsSelected, setLocalIsSelected] = useState(isSelected); // Local state for immediate UI feedback
 
   useEffect(() => {
-    if (displayMode !== 'editing') {
-      return;
-    }
-    const handleClickOutside = (ev: MouseEvent) => {
-      const isClickInsideTextInput = ev.target instanceof HTMLInputElement && ev.target.classList.contains('editable-text-input');
-      if (!isClickInsideTextInput) {
-        setIsEditing(false);
-        document.removeEventListener('mousedown', handleClickOutside);
+    setLocalIsSelected(isSelected);
+  }, [isSelected]);
+
+  useEffect(() => {
+    if (displayMode === 'editing') {
+      const handleClickOutside = (ev: MouseEvent) => {
+        const isClickInsideTextInput = ev.target instanceof HTMLInputElement && ev.target.classList.contains('editable-text-input');
+        if (!isClickInsideTextInput) {
+          setIsEditing(false);
+        }
       }
-    }
-    if (isEditing) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      if (isEditing) {
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+      }
     }
   }, [isEditing, displayMode]);
 
@@ -44,33 +115,76 @@ export const DynamicComponent: React.FC<PropsWithChildren<{id: string, config: C
     if (displayMode === 'editing' && !isEditing && config.attributes.textContent !== editContent) {
       dispatch(add({ id, config: { ...config, attributes: { ...config.attributes, textContent: editContent } } }));
     }
-  }, [displayMode, isEditing, editContent, config, id, dispatch])
+  }, [displayMode, isEditing, editContent, config, id, dispatch]);
 
-  const toggleEdit: React.MouseEventHandler<HTMLElement> = (event) => {
-    setIsEditing(true);
+  const toggleIsSelected = (isSelected: boolean) => {
+    if (lastClickEventRef.current && (lastClickEventRef.current.metaKey || lastClickEventRef.current.ctrlKey)) { // Check if Cmd (metaKey) or Ctrl (ctrlKey) is pressed
+      dispatch(addSelectedId(id));
+    } else {
+      dispatch(setSelectedIds([id]));
+    }
+  };
+
+  // useEffect(() => {
+  //   if (!isEditing && localIsSelected !== isSelected) {
+  //     toggleIsSelected();
+  //   }
+  // }, [localIsSelected, isEditing, isSelected, toggleIsSelected])
+
+  const handleDoubleClick: React.MouseEventHandler<HTMLElement> = (event) => {
+    setIsEditing(current => !current);
     event.stopPropagation();
   }
 
-  const onClick = (isEditing || displayMode === 'preview') ? undefined : toggleEdit;
+  const clickDownTimeRef = useRef<number | null>(null);
+  const lastClickTimeRef = useRef<number | null>(null);
+  const lastClickEventRef = useRef<React.MouseEvent<HTMLElement> | React.TouchEvent<HTMLElement> | null>(null);
+  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const eventContextIds = [...new Set(config.events
-    .map(e => e.actions.map(a => a.contextId))
-    .flat())]; // Flatten and then remove duplicates using Set
-
-  // const effectContextIds = [...new Set(config.effects
-    // .map(e => e.actions.map(a => a.contextId))
-    // .flat())]; // Flatten and then remove duplicates using Set
-
-  // const contextIds = [...new Set(eventContextIds.concat(effectContextIds))];
-
-  const attributeContextIds = Object.values(config.attributes)
-    .filter((a): a is ProviderDependencyConfig => typeof a !== 'string')
-    .map(a => a.contextId);
-
-    const contextIds = [...new Set(eventContextIds.concat(attributeContextIds))];
+  const handleMouseDown = (event: React.MouseEvent<HTMLElement> | React.TouchEvent<HTMLElement>) => {
+    event.stopPropagation();
+    clickDownTimeRef.current = Date.now();
+    lastClickEventRef.current = event;
+  };
   
-  // Setup useEffects
-  // config.effects.forEach(effectConfig => useDynamicEffect(effectConfig));
+  const handleMouseUp = (event: React.MouseEvent<HTMLElement> | React.TouchEvent<HTMLElement>) => {
+    event.stopPropagation();
+    // Only handle single click if double click hasn't been handled
+    if (
+        clickDownTimeRef.current && 
+        (Date.now() - clickDownTimeRef.current) < 100 && // make sure this isn't a drag
+        (Date.now() - (lastClickTimeRef.current || 0)) > 200 // don't interfere with a double click
+      ) {
+      console.log('single click', Date.now() - (lastClickTimeRef.current || 0));
+
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current);
+      }
+
+      clickTimeoutRef.current = setTimeout(() => {
+        toggleIsSelected(!localIsSelected);
+        clickTimeoutRef.current = null;
+      }, 205);
+
+      setLocalIsSelected(true) // Cast event type if necessary
+      
+
+       // Adjust the timeout duration if needed, ensuring it's slightly longer than the double click detection window
+    } else if (lastClickTimeRef.current && (Date.now() - lastClickTimeRef.current) < 200) {
+      console.log('double click')
+      // If the time difference between the last click and this one is less than 250ms, consider it a double click
+      handleDoubleClick(event as React.MouseEvent<HTMLElement>); // Cast event type if necessary
+    }
+
+    lastClickTimeRef.current = Date.now();
+  };
+  
+  const onMouseDown = (isEditing || displayMode === 'preview') ? undefined : handleMouseDown;
+  const onMouseUp = (isEditing || displayMode === 'preview') ? undefined : handleMouseUp;
+
+  const eventContextIds = extractContextIdsFromEvents(config.events);
+  const attributeContextIds = extractContextIdsFromAttributes(config.attributes);
+  const contextIds = [...new Set([...eventContextIds, ...attributeContextIds])];
 
   const Component = useComponent(config.type);
   if (!Component) {
@@ -81,68 +195,32 @@ export const DynamicComponent: React.FC<PropsWithChildren<{id: string, config: C
     <DynamicContextConsumer
       contextIds={contextIds}
       render={(contexts) => {
+        const attributes = resolveAttributes(config.attributes, contexts);
+        let convertedHandlers = convertEventHandlers(config.events, contexts);
+        if (onMouseDown) {
+          convertedHandlers['onMouseDown'] = onMouseDown;
+          convertedHandlers['onTouchStart'] = onMouseDown;
+        }
+        if (onMouseUp) {
+          convertedHandlers['onMouseUp'] = onMouseUp;
+          convertedHandlers['onTouchEnd'] = onMouseUp;
+        }
 
-        // attributes can be either a string or a ProviderDependencyConfig.
-        // If they are a ProviderDependencyConfig, we can use the context to get the value.
-        
-        const attributes = Object.keys(config.attributes).reduce((acc, key) => {
-          const value = config.attributes[key];
-          if (typeof value === 'string') {
-            acc[key] = value;
-          } else {
-            acc[key] = convertProviderDependencyConfigToString(contexts, value);
-          }
-          return acc;
-        }, {} as Record<string, string>);
+        // textarea & input can't have children
+        const adjDroppable = droppable && !['textarea', 'input'].includes(config.type);
+        const WrappedComponent = withDragAndDrop(draggable, adjDroppable, Component);
 
-        let convertedHandlers: Record<string, React.MouseEventHandler<HTMLElement>> = {};
-        config.events.forEach((configEvent) => {
-          convertedHandlers[configEvent.name] = ((contexts: Record<string, { dispatch: Function }>) => {
-            return (event: React.MouseEvent) => {
-              console.log('event', event);
-              configEvent.actions.forEach((action) => {
-                if (contexts[action.contextId] && typeof contexts[action.contextId].dispatch === 'function') {
-                  contexts[action.contextId].dispatch({ type: action.actionName, payload: action.actionPayload ? JSON.parse(action.actionPayload) : null });
-                } else {
-                  console.error(`Context with id ${action.contextId} not found or dispatch not a function`);
-                }
-              });
-            };
-          })(contexts);
-        });
-        // const convertedHandlers: ConvertedHandlers = Object.keys(eventHandlers).reduce<ConvertedHandlers>((acc, key) => {
-        //   const handler = eventHandlers[key];
-        //   console.log('handler', handler);
-        //   const bodies: string[] = [];
-        //   for (const call of handler.calls) {
-        //     bodies.push(`contexts['${call.contextId}']['dispatch'](` + call.body + ');');
-        //   }
-        //   const args = [...handler.args, 'contexts'];
-        //   console.log(contexts);
-        //   console.log(args);
-        //   console.log(bodies);
-        //   // eslint-disable-next-line no-new-func
-        //   acc[key] = ((contexts) => {
-        //     return (event) => {
-        //       for (const call of handler.calls) {
-        //         if (contexts[call.contextId] && typeof contexts[call.contextId]['dispatch'] === 'function') {
-        //           contexts[call.contextId]['dispatch']({ type: call.body.type, payload: call.body.payload });
-        //         } else {
-        //           console.error(`Context with id ${call.contextId} not found or dispatch not a function`);
-        //         }
-        //       }
-        //     };
-        //   })(contexts);
-        //   return acc;
-        // }, {})
+        if (config.type === 'textarea' || config.type === 'input') {
+          return <WrappedComponent id={id} {...convertedHandlers} {...config.attributes} {...props}/>;
+        }
 
-        if (onClick) {
-          convertedHandlers['onClick'] = onClick;
-        } 
+        const atts = {
+          ...config.attributes,
+          className: localIsSelected ? `${config.attributes.className || ''} shadow-xl outline outline-2 outline-offset-2 outline-blue-500 transform scale-103` : config.attributes.className
+        }
 
-        const Comp = withDragAndDrop(draggable, droppable, Component);
         return (
-          <Comp id={id} onClick={onClick} {...convertedHandlers} {...config.attributes} {...props}>
+          <WrappedComponent id={id} {...convertedHandlers} {...atts} {...props}>
             <Filler
               hasChildren={childrenIds.length > 0}
               childrenIds={childrenIds}
@@ -155,7 +233,7 @@ export const DynamicComponent: React.FC<PropsWithChildren<{id: string, config: C
               droppable={droppable}
               displayMode={displayMode}
             />
-          </Comp>
+          </WrappedComponent>
         );
       }}
     />

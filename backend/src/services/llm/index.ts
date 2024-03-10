@@ -45,38 +45,43 @@ class JsonValidationError extends Error {
  * @returns A promise that resolves to a message object.
  * @throws If the LLM errors out or if the json response is invalid.
  */
-async function queryLlmWithJsonValidation(messages: LlmMessage[], jsonValidator: (json: any) => boolean, temperature: number = 0, customError: JsonValidationError | null = null): Promise<LlmMessage> {
-  if (customError && customError.messages) {
-    messages = messages.concat(customError.messages);
-  }
-  console.log('queryLlmWithJsonValidation:', JSON.stringify(messages));
-  const res: OpenAI.ChatCompletion = await openai.chat.completions.create({
-    model: 'gpt-4-0125-preview',
-    // model: 'gpt-3.5-turbo-0125',
-    messages: messages.map(msg => ({role: msg.role, content: msg.content})),
-    temperature: temperature,
-    top_p: 1,
-    max_tokens: 4096,
-    response_format: {type: 'json_object'},
-  });
-  const message: LlmMessage = { role: res.choices[0].message.role, content: res.choices[0].message.content || '' };
-  console.log('response:', JSON.stringify(message));
-  try {
-    const json = JSON.parse(message.content);
-    if (jsonValidator(json)) {
-      return message;
-    } else {
-      throw new JsonValidationError('Invalid JSON response', [message]);
+async function queryLlmWithJsonValidation(
+  messages: LlmMessage[], 
+  jsonValidator: (json: any) => boolean, 
+  model: 'gpt-4-0125-preview' | 'gpt-3.5-turbo-0125', 
+  temperature: number = 0, 
+  customError: JsonValidationError | null = null): Promise<LlmMessage> {
+    if (customError && customError.messages) {
+      messages = messages.concat(customError.messages);
     }
-  } catch (error) {
-    if (error instanceof Error) {
-      const augmentedError = new JsonValidationError(`Error: ${error.message}`, [message, {role: 'user', content: `Error: ${error.message}`}]);
-      console.error(augmentedError);
-      throw augmentedError;
-    } else {
-      throw new JsonValidationError('An unknown error occurred', []);
+    console.log('queryLlmWithJsonValidation:', JSON.stringify(messages));
+    const res: OpenAI.ChatCompletion = await openai.chat.completions.create({
+      // model: 'gpt-4-0125-preview',
+      model: model,
+      messages: messages.map(msg => ({role: msg.role, content: msg.content})),
+      temperature: temperature,
+      top_p: 1,
+      max_tokens: 4096,
+      response_format: {type: 'json_object'},
+    });
+    const message: LlmMessage = { role: res.choices[0].message.role, content: res.choices[0].message.content || '' };
+    console.log('response:', JSON.stringify(message));
+    try {
+      const json = JSON.parse(message.content);
+      if (jsonValidator(json)) {
+        return message;
+      } else {
+        throw new JsonValidationError('Invalid JSON response', [message]);
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        const augmentedError = new JsonValidationError(`Error: ${error.message}`, [message, {role: 'user', content: `Error: ${error.message}`}]);
+        console.error(augmentedError);
+        throw augmentedError;
+      } else {
+        throw new JsonValidationError('An unknown error occurred', []);
+      }
     }
-  }
 }
 
 export { queryLlm, queryLlmWithJsonValidation };
