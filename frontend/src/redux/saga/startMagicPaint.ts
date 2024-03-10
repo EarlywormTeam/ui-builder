@@ -1,9 +1,10 @@
 import { call, put, select, takeLatest } from 'redux-saga/effects';
-import { doMagicWiring, setNewConfigTree } from '../slice/canvasSlice';
+import { setNewConfigTree } from '../slice/canvasSlice';
 import { getCanvasState } from '../selector';
 import * as api from 'src/api';
+import { startMagicPaint, stopMagicPaint } from '../slice/loadingSlice';
 
-function* handleDoMagicWiring() {
+function* handleStartMagicPaint() {
   try {
     const { configMap, childrenMap } = yield select(getCanvasState);
     const buildTree = (id: string) => {
@@ -15,15 +16,16 @@ function* handleDoMagicWiring() {
 
     const postConfigTree = buildTree('canvas');
     
-    const { data: { configTree } } = yield call(api.doMagicWiring, postConfigTree);
+    const { data: { configTree } } = yield call(api.doMagicPaint, postConfigTree);
     // update the canvas state with the new config tree
     yield put(setNewConfigTree({configTree}));
   } catch (error) {
-    console.error('Error doing magic wiring', error);
+    console.error('Error doing magic paint', error);
   }
+  yield put(stopMagicPaint());
 }
 
-export function* watchDoMagicWiring() {
-  yield takeLatest(doMagicWiring, handleDoMagicWiring);
+export function* watchStartMagicPaint() {
+  yield takeLatest(startMagicPaint, handleStartMagicPaint);
 }
 

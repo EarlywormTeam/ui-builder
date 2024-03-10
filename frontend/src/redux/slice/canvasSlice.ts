@@ -5,14 +5,22 @@ import { Context } from 'react';
 
 export const contextMap: Record<string, Context<any>> = {};
 
-export interface CanvasState {
-  projectDescription: string | null;
+interface CanvasComponentState {
   configMap: Record<string, ComponentConfig | ProviderConfig>;
   childrenMap: Record<string, string[]>;
   parentMap: Record<string, string>;
+}
+
+interface UndoRedoState {
+  past: Array<CanvasComponentState>,
+  present: CanvasComponentState,
+  future: Array<CanvasComponentState>
+}
+
+export interface CanvasState {
+  projectDescription: string | null;
+  componentState: UndoRedoState;
   selectedIds: Array<string>;
-  magicWiringLoading: boolean;
-  magicPaintingLoading: boolean;
 }
 
 const defaultConfigMap: Record<string, ComponentConfig | ProviderConfig> = {
@@ -80,47 +88,103 @@ const defaultConfigMap: Record<string, ComponentConfig | ProviderConfig> = {
 
 const initialState: CanvasState = {
   projectDescription: null,
-  configMap: defaultConfigMap,
-  childrenMap: {} as Record<string, string[]>,
-  parentMap: {} as Record<string, string>,
+  componentState: {
+    past: [],
+    present: {
+      configMap: defaultConfigMap,
+      childrenMap: {} as Record<string, string[]>,
+      parentMap: {} as Record<string, string>,
+    },
+    future: [],
+  },
   selectedIds: [] as Array<string>,
-  magicWiringLoading: false,
-  magicPaintingLoading: false
 };
 
 const _removeId = (id: string, state: CanvasState) => {
-  const parentId = state.parentMap[id];
+  const componentState = state.componentState.present;
+  const parentId = componentState.parentMap[id];
   if (parentId) {
-    state.childrenMap[parentId] = state.childrenMap[parentId].filter(childId => childId !== id);
-    delete state.parentMap[id];
+    componentState.childrenMap[parentId] = componentState.childrenMap[parentId].filter(childId => childId !== id);
+    delete componentState.parentMap[id];
   } 
 }
 
 const _deleteId = (id: string, state: CanvasState) => {
-  if (state.childrenMap[id]) {
-    state.childrenMap[id].forEach(childId => _deleteId(childId, state));
+  const componentState = state.componentState.present;
+  if (componentState.childrenMap[id]) {
+    componentState.childrenMap[id].forEach(childId => _deleteId(childId, state));
   }
   _removeId(id, state);
-  delete state.configMap[id];
+  delete componentState.configMap[id];
   delete contextMap[id];
   state.selectedIds = state.selectedIds.filter((sid: string) => sid !== id);
 }
 
-const insertId = (id: string, parentId: string, index: number | null, state: CanvasState) => {
-  if (!state.childrenMap[parentId]) {
-    state.childrenMap[parentId] = [];
+const _insertId = (id: string, parentId: string, index: number | null, state: CanvasState) => {
+  const componentState = state.componentState.present;
+  if (!componentState.childrenMap[parentId]) {
+    componentState.childrenMap[parentId] = [];
   }
-  const children = state.childrenMap[parentId];
+  const children = componentState.childrenMap[parentId];
   const insertAt = index !== null ? index : children.length;
-  state.childrenMap[parentId] = [...children.slice(0, insertAt), id, ...children.slice(insertAt)];
-  state.parentMap[id] = parentId;
+  componentState.childrenMap[parentId] = [...children.slice(0, insertAt), id, ...children.slice(insertAt)];
+  componentState.parentMap[id] = parentId;
 
-  if ('actions' in state.configMap[id] && 'initialState' in state.configMap[id]) {
+  if ('actions' in componentState.configMap[id] && 'initialState' in componentState.configMap[id]) {
     // It's a provider config, we need to hydrate the context and store it in the contextMap
-    const config = state.configMap[id] as ProviderConfig;
+    const config = componentState.configMap[id] as ProviderConfig;
     const context = createContext({state: config.initialState, dispatch: () => {}})
     contextMap[id] = context;
   }
+}
+
+const _addId = (id: string, config: ComponentConfig | ProviderConfig, state: CanvasState) => {
+  state.componentState.present.configMap[id] = config;
+}
+
+const _updateTree = (node: any, state: CanvasState, parentId: string = 'canvas', depth=0) => {
+  if (node.id !== 'canvas') {
+    console.log('updateTree', node.id, node.config?.type || node.config?.name, depth, Array.isArray(node.children) ? node.children.length : 0);
+    
+    const existingConfig = state.componentState.present.configMap[node.id];
+
+    const existingParentId = state.componentState.present.parentMap[node.id];
+    if (parentId !== existingParentId) {
+      if (existingParentId) {
+        _removeId(node.id, state);
+      }
+    }
+
+    const needsUpdate = !existingConfig || JSON.stringify(existingConfig) !== JSON.stringify(node.config);
+    if (needsUpdate) {
+      state.componentState.present.configMap[node.id] = node.config;
+    }
+
+    if (parentId !== existingParentId) {
+      _insertId(node.id, parentId, null, state);
+    }
+  }
+  
+  const oldChildrenIds = state.componentState.present.childrenMap[node.id] || [];
+  if (!node.children) {
+    node.children = [];
+  }
+  const newChildrenIds = node.children.map((child: any) => child.id);
+
+  for (const oldChildId of oldChildrenIds) {
+    if (!newChildrenIds.includes(oldChildId)) {
+      _deleteId(oldChildId, state);
+    }
+  }
+
+  for (const child of node.children) {
+    _updateTree(child, state, node.id, depth + 1);
+  }
+}
+
+const updatePresentState = (state: CanvasState, stateChanger: () => void) => {
+  state.componentState.past.push(state.componentState.present);
+  stateChanger();
 }
 
 const canvasSlice = createSlice({
@@ -129,75 +193,30 @@ const canvasSlice = createSlice({
   reducers: {
     add: (state, action: PayloadAction<{ id: string; config: ComponentConfig | ProviderConfig }>) => {
       const { id, config } = action.payload;
-      state.configMap[id] = config;
+      updatePresentState(state, () => _addId(id, config, state));
     },
     insertChild: (state, action: PayloadAction<{ id: string; parentId: string; index: number | null }>) => {
       const { id, parentId, index } = action.payload;
-      insertId(id, parentId, index, state);
+      updatePresentState(state, () => _insertId(id, parentId, index, state));
     },
     deleteId: (state, action: PayloadAction<{ id: string }>) => {
       const { id } = action.payload;
-      _deleteId(id, state);
+      updatePresentState(state, () => _deleteId(id, state));
     },
     deleteSelected: (state) => {
-      state.selectedIds.forEach(id => {
-        _deleteId(id, state);
+      updatePresentState(state, () => {
+        state.selectedIds.forEach(id => {
+          _deleteId(id, state);
+        });
       });
     },
     removeId: (state, action: PayloadAction<{ id: string }>) => {
       const { id } = action.payload;
-      _removeId(id, state);
-    },
-    doMagicWiring: (state) => {
-      state.magicWiringLoading = true;
-    },
-    doMagicPaint: (state) => {
-      state.magicPaintingLoading = true;
+      updatePresentState(state, () => _removeId(id, state));
     },
     setNewConfigTree: (state, action: PayloadAction<{ configTree: any }>) => {
       const {configTree} = action.payload;
-      const updateTree = (node: any, parentId: string = 'canvas', depth=0) => {
-        if (node.id !== 'canvas') {
-          console.log('updateTree', node.id, node.config?.type || node.config?.name, depth, Array.isArray(node.children) ? node.children.length : 0);
-          
-          const existingConfig = state.configMap[node.id];
-
-          const existingParentId = state.parentMap[node.id];
-          if (parentId !== existingParentId) {
-            if (existingParentId) {
-              _removeId(node.id, state);
-            }
-          }
-
-          const needsUpdate = !existingConfig || JSON.stringify(existingConfig) !== JSON.stringify(node.config);
-          if (needsUpdate) {
-            state.configMap[node.id] = node.config;
-          }
-
-          if (parentId !== existingParentId) {
-            insertId(node.id, parentId, null, state);
-          }
-        }
-        
-        const oldChildrenIds = state.childrenMap[node.id] || [];
-        if (!node.children) {
-          node.children = [];
-        }
-        const newChildrenIds = node.children.map((child: any) => child.id);
-
-        for (const oldChildId of oldChildrenIds) {
-          if (!newChildrenIds.includes(oldChildId)) {
-            _deleteId(oldChildId, state);
-          }
-        }
-
-        for (const child of node.children) {
-          updateTree(child, node.id, depth + 1);
-        }
-      }
-      updateTree(configTree);
-      state.magicWiringLoading = false;
-      state.magicPaintingLoading = false;
+      updatePresentState(state, () => _updateTree(configTree, state));
     },
     genStarterTemplate: (state, action: PayloadAction<{ projectDescription: string }>) => {
       const { projectDescription } = action.payload;
@@ -211,10 +230,24 @@ const canvasSlice = createSlice({
     },
     removeSelectedId: (state, action: PayloadAction<string>) => {
       state.selectedIds = state.selectedIds.filter(id => id !== action.payload);
+    },
+    undo: (state) => {
+      const savedState = state.componentState.past.pop();
+      if (savedState) {
+        state.componentState.future.push(state.componentState.present);
+        state.componentState.present = savedState;
+      }
+    },
+    redo: (state) => {
+      const futureState = state.componentState.future.pop();
+      if (futureState) {
+        state.componentState.past.push(state.componentState.present);
+        state.componentState.present = futureState;
+      }
     }
   },
 });
 
-export const { add, insertChild, removeId, doMagicWiring, doMagicPaint, setNewConfigTree, genStarterTemplate, setSelectedIds, deleteSelected, deleteId, addSelectedId, removeSelectedId } = canvasSlice.actions;
+export const { add, insertChild, removeId, setNewConfigTree, genStarterTemplate, setSelectedIds, deleteSelected, deleteId, addSelectedId, removeSelectedId } = canvasSlice.actions;
 
 export default canvasSlice.reducer;

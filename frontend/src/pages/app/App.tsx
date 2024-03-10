@@ -5,7 +5,8 @@ import { RootState } from 'src/redux/store';
 import ComponentMenu from './components/ComponentMenu'; // Your component menu component
 import Canvas from './components/Canvas'; // Your canvas component
 import { Button } from 'src/components/ui/button';
-import { add, deleteSelected, doMagicWiring, doMagicPaint, insertChild, removeId } from 'src/redux/slice/canvasSlice';
+import { add, deleteSelected, insertChild, removeId } from 'src/redux/slice/canvasSlice';
+import { startMagicPaint, startMagicWiring } from 'src/redux/slice/loadingSlice';
 import ProjectStartModal from './components/ProjectStartModal';
 import ComponentMap from './components/ComponentMap';
 import { DynamicElement } from './components/ir/good/DynamicElement';
@@ -16,8 +17,8 @@ const DragAndDrop = () => {
   const [activeId, setActiveId] = useState<string | null>(null);
   const configMap = useSelector((state: RootState) => state.canvas.configMap);
   const childrenMap = useSelector((state: RootState) => state.canvas.childrenMap);
-  const magicWiringLoading = useSelector((state: RootState) => state.canvas.magicWiringLoading);
-  const magicPaintingLoading = useSelector((state: RootState) => state.canvas.magicPaintingLoading);
+  const magicWiringLoading = useSelector((state: RootState) => state.loading.magicWiringLoading);
+  const magicPaintingLoading = useSelector((state: RootState) => state.loading.magicPaintingLoading);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -92,7 +93,7 @@ const DragAndDrop = () => {
             </Button>
             <Button
               variant={'default'}
-              onClick={() => dispatch(doMagicPaint())}
+              onClick={() => dispatch(startMagicPaint())}
               disabled={magicWiringLoading || magicPaintingLoading} // Disable button when loading
             >
               {magicPaintingLoading ? (
@@ -106,7 +107,7 @@ const DragAndDrop = () => {
             </Button>
             <Button 
               variant={'default'} 
-              onClick={() => dispatch(doMagicWiring())}
+              onClick={() => dispatch(startMagicWiring())}
               disabled={magicWiringLoading || magicPaintingLoading} // Disable button when loading
             >
               {magicWiringLoading ? (
