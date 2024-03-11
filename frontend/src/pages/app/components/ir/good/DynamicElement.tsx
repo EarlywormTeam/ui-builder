@@ -6,8 +6,8 @@ import { DynamicProvider } from "./DynamicProvider";
 
 export function DynamicElement({id, draggable, droppable, mode}: {id: string, draggable: boolean, droppable: boolean, mode?: 'preview' | 'editing'}) {
   
-  const config: ComponentConfig | ProviderConfig = useSelector((state: RootState) => state.canvas.configMap[id]);
-  const childrenIds: Array<string> = useSelector((state: RootState) => state.canvas.childrenMap[id]) || [];
+  const config: ComponentConfig | ProviderConfig = useSelector((state: RootState) => state.canvas.componentState.present.configMap[id]);
+  const childrenIds: Array<string> = useSelector((state: RootState) => state.canvas.componentState.present.childrenMap[id]) || [];
 
   if (!config) {
     return null;

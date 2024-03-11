@@ -32,7 +32,7 @@ const extractContextIdsFromAttributes = (attributes: Record<string, ProviderDepe
 const resolveAttributes = (attributes: Record<string, ProviderDependencyConfig | string>, contexts: Record<string, any>): Record<string, string> => {
   return Object.keys(attributes).reduce((acc: Record<string, string>, key: string) => {
     const value = attributes[key];
-    if (typeof value === 'string') {
+    if (typeof value === 'string' || !value) {
       acc[key] = value;
     } else {
       acc[key] = convertProviderDependencyConfigToString(contexts, value);
@@ -88,7 +88,7 @@ export const DynamicComponent: React.FC<PropsWithChildren<{id: string, config: C
   const displayMode = mode || 'preview';
   const dispatch = useDispatch();
   const [isEditing, setIsEditing] = useState(false);
-  const [editContent, setEditContent] = useState(config.attributes.textContent) || '';
+  const [editContent, setEditContent] = useState(config.attributes.textcontent) || '';
   const isSelected = useIsSelected(id);
   const [localIsSelected, setLocalIsSelected] = useState(isSelected); // Local state for immediate UI feedback
 
@@ -112,8 +112,8 @@ export const DynamicComponent: React.FC<PropsWithChildren<{id: string, config: C
   }, [isEditing, displayMode]);
 
   useEffect(() => {
-    if (displayMode === 'editing' && !isEditing && config.attributes.textContent !== editContent) {
-      dispatch(add({ id, config: { ...config, attributes: { ...config.attributes, textContent: editContent } } }));
+    if (displayMode === 'editing' && !isEditing && config.attributes.textcontent !== editContent) {
+      dispatch(add({ id, config: { ...config, attributes: { ...config.attributes, textcontent: editContent } } }));
     }
   }, [displayMode, isEditing, editContent, config, id, dispatch]);
 
@@ -225,8 +225,8 @@ export const DynamicComponent: React.FC<PropsWithChildren<{id: string, config: C
               hasChildren={childrenIds.length > 0}
               childrenIds={childrenIds}
               isEditing={isEditing}
-              editContent={typeof editContent === 'string' ? editContent : convertProviderDependencyConfigToString(contexts, editContent)}
-              content={attributes.textContent || ''}
+              editContent={typeof editContent !== 'object' ? editContent : convertProviderDependencyConfigToString(contexts, editContent)}
+              content={attributes.textcontent || ''}
               setEditContent={setEditContent}
               setIsEditing={setIsEditing}
               draggable={draggable}

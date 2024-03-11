@@ -36,12 +36,17 @@ const defaultConfigMap: Record<string, ComponentConfig | ProviderConfig> = {
   },
   label: {
     type: 'label',
-    attributes:  { className: 'inline', textContent: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit'},
+    attributes:  { className: 'inline', textcontent: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit'},
     events: [],
   },
   button: {
     type: 'button',
-    attributes:  {className: 'flex w-full', textContent: 'Button'},
+    attributes:  {className: 'flex w-full', textcontent: 'Button'},
+    events: [],
+  },
+  switch: {
+    type: 'switch',
+    attributes: { className: 'inline-flex items-center' },
     events: [],
   },
   input: {
@@ -56,22 +61,27 @@ const defaultConfigMap: Record<string, ComponentConfig | ProviderConfig> = {
   },
   rowLayout__demo: {
     type: 'div',
-    attributes: {className: 'flex w-full', textContent: 'Row Layout'},
+    attributes: {className: 'flex w-full', textcontent: 'Row Layout'},
     events: [],
   },
   colLayout__demo: {
     type: 'div',
-    attributes:  { className: 'flex w-full', textContent: 'Column Layout'},
+    attributes:  { className: 'flex w-full', textcontent: 'Column Layout'},
     events: [],
   },
   label__demo: {
     type: 'label',
-    attributes:  { className: 'inline', textContent: 'Label'},
+    attributes:  { className: 'inline', textcontent: 'Label'},
     events: [],
   },
   button__demo: {
     type: 'button',
-    attributes:  {className: 'flex w-full', textContent: 'Button'},
+    attributes:  {className: 'flex w-full', textcontent: 'Button'},
+    events: [],
+  },
+  switch__demo: {
+    type: 'switch',
+    attributes: {className: 'inline-flex items-center'},
     events: [],
   },
   input__demo: {
@@ -183,7 +193,7 @@ const _updateTree = (node: any, state: CanvasState, parentId: string = 'canvas',
 }
 
 const updatePresentState = (state: CanvasState, stateChanger: () => void) => {
-  state.componentState.past.push(state.componentState.present);
+  state.componentState.past.push(JSON.parse(JSON.stringify(state.componentState.present)));
   stateChanger();
 }
 
@@ -193,7 +203,7 @@ const canvasSlice = createSlice({
   reducers: {
     add: (state, action: PayloadAction<{ id: string; config: ComponentConfig | ProviderConfig }>) => {
       const { id, config } = action.payload;
-      updatePresentState(state, () => _addId(id, config, state));
+      _addId(id, config, state);
     },
     insertChild: (state, action: PayloadAction<{ id: string; parentId: string; index: number | null }>) => {
       const { id, parentId, index } = action.payload;
@@ -248,6 +258,6 @@ const canvasSlice = createSlice({
   },
 });
 
-export const { add, insertChild, removeId, setNewConfigTree, genStarterTemplate, setSelectedIds, deleteSelected, deleteId, addSelectedId, removeSelectedId } = canvasSlice.actions;
+export const { add, insertChild, removeId, setNewConfigTree, genStarterTemplate, setSelectedIds, deleteSelected, deleteId, addSelectedId, removeSelectedId, undo, redo } = canvasSlice.actions;
 
 export default canvasSlice.reducer;

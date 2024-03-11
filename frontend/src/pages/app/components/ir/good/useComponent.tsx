@@ -1,11 +1,12 @@
 import { Div } from 'src/components';
-import { Label, Button, Textarea, Input } from 'src/components/ui';
+import { Label, Button, Textarea, Input, Switch} from 'src/components/ui';
 
 
 const componentMap: Record<string, React.FC<any>> = {
   div: Div,
   label: Label,
   button: Button,
+  switch: Switch,
   textarea: Textarea,
   input: Input,
 };

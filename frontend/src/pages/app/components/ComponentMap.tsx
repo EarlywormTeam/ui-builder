@@ -5,9 +5,9 @@ import { setSelectedIds } from 'src/redux/slice/canvasSlice';
 
 const ComponentList: React.FC = () => {
   const [contractedIds, setContractedIds] = useState<string[]>([]);
-  const childrenMap = useSelector((state: RootState) => state.canvas.childrenMap);
+  const childrenMap = useSelector((state: RootState) => state.canvas.componentState.present.childrenMap);
   const selectedIds = useSelector((state: RootState) => state.canvas.selectedIds);
-  const configMap = useSelector((state: RootState) => state.canvas.configMap);
+  const configMap = useSelector((state: RootState) => state.canvas.componentState.present.configMap);
   const dispatch = useDispatch();
 
   const toggleContract = useCallback((id: string) => {

@@ -13,7 +13,7 @@ export const useDynamicContexts = (ids: string[]) => {
 }
 
 export const useChildrenIds = (id: string) => {
-  const childrenIds = useSelector((state: RootState) => state.canvas.childrenMap[id]);
+  const childrenIds = useSelector((state: RootState) => state.canvas.componentState.present.childrenMap[id]);
   return childrenIds || [];
 }
 
