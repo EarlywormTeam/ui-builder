@@ -26,7 +26,7 @@ const Toolbar: React.FC<ToolbarProps> = ({isPreview, setIsPreview}) => {
         <div className="flex items-center space-x-2">
           <Label htmlFor="display-mode">Edit</Label>
           <Switch id="display-mode" onCheckedChange={(checked) => setIsPreview(checked)} />
-          <Label htmlFor="airplane-mode">Preview</Label>
+          <Label htmlFor="display-mode">Preview</Label>
         </div>
         <Button
               variant={'default'}

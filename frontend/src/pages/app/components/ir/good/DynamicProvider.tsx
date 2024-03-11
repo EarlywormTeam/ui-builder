@@ -1,4 +1,4 @@
-import { useReducer, PropsWithChildren, createContext, useContext } from 'react';
+import { useReducer, PropsWithChildren } from 'react';
 import { ProviderConfig } from './config';
 import { useDynamicContexts } from 'src/redux/selector';
 
@@ -9,7 +9,7 @@ export function DynamicProvider({id, config, children}: PropsWithChildren<{id: s
 }
 
 // Dynamically create reducer from JSON
-const createReducer = (actions: Array<{name: string, payload: string, reducerCode: string}>) => {
+const createReducer = (actions: Array<{name: string, reducerCode: string}>) => {
   return (state: any, action: any) => {
     const matchedAction = actions.find(a => a.name === action.type);
     if (!matchedAction) return state;

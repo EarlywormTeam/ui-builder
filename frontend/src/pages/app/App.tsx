@@ -16,6 +16,7 @@ const DragAndDrop = () => {
   const [activeId, setActiveId] = useState<string | null>(null);
   const configMap = useSelector((state: RootState) => state.canvas.componentState.present.configMap);
   const childrenMap = useSelector((state: RootState) => state.canvas.componentState.present.childrenMap);
+  const projectTemplateLoading = useSelector((state: RootState) => state.loading.projectTemplateLoading);
   
 
   useEffect(() => {
@@ -75,31 +76,38 @@ const DragAndDrop = () => {
   );
 
   return (
-    <DndContext onDragStart={(event) => onDragStart(event as any)} onDragEnd={(event) => onDragEnd(event as any)} sensors={sensors}>
-      <div className="flex flex-col h-full w-full overflow-hidden">
-        <ProjectStartModal/>
-        <Toolbar isPreview={isPreview} setIsPreview={setIsPreview} />
-        <div className="flex h-full w-full overflow-hidden">
-          <div className="flex h-full w-1/4">
-            <ComponentMap />
-          </div>
-          <div className="flex h-full w-full">
-            <Canvas isPreview={isPreview} />
-          </div>
-          <div className="flex h-full w-1/4 gap-4">
-            <ComponentMenu />
-          </div>
-          <DragOverlay dropAnimation={ {
-            duration: 400,
-            easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
-            }}>
-            {activeId ? (
-              <DynamicElement id={activeId} draggable={false} droppable={false} mode="preview" />
-            ): null}
-          </DragOverlay>
+    <div className={`h-full w-full relative ${projectTemplateLoading ? 'pointer-events-none' : ''}`}>
+      {projectTemplateLoading && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-20">
+          <div className="animate-spin rounded-full h-32 w-32 border-t-4 border-b-4 border-white"></div>
         </div>
-      </div>
-    </DndContext>
+      )}
+      <DndContext onDragStart={(event) => onDragStart(event as any)} onDragEnd={(event) => onDragEnd(event as any)} sensors={sensors}>
+        <div className="flex flex-col h-full w-full overflow-hidden">
+          <ProjectStartModal/>
+          <Toolbar isPreview={isPreview} setIsPreview={setIsPreview} />
+          <div className="flex h-full w-full overflow-hidden">
+            <div className="flex h-full w-1/4">
+              <ComponentMap />
+            </div>
+            <div className="flex h-full w-full">
+              <Canvas isPreview={isPreview} />
+            </div>
+            <div className="flex h-full w-1/4 gap-4">
+              <ComponentMenu />
+            </div>
+            <DragOverlay dropAnimation={{
+              duration: 400,
+              easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
+            }}>
+              {activeId ? (
+                <DynamicElement id={activeId} draggable={false} droppable={false} mode="preview" />
+              ) : null}
+            </DragOverlay>
+          </div>
+        </div>
+      </DndContext>
+    </div>
   );
 };
 

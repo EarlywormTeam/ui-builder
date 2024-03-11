@@ -52,16 +52,26 @@ Event actions must have an actionName and a contextId. The actionName must be th
 
 Sometimes no work is required and in that case you may return an empty string to signify no work is necessary.
 
-\`\`\`json
+\`\`\`tsx
+// Use modifiers for string interpolation or running functions.
+// For example, if you want to access document.getElementById('todoInput').value
+// you can use a modifier like this: 
+// {body: 'return document.getElementById("todoInput").value;'}
+interface ModifierFunction {
+  body: string,
+}
+
+// Example of event names: onClick, onBlur, onMouseDown, onKeyDown, etc.
+// Example of attributes: Classname, textContent, type, etc.
 export interface ComponentConfig {
   type: 'button' | 'label' | 'textarea' | 'div' | 'input',
   attributes: Record<string, string | ProviderDependencyConfig>,
-  events: Array<{name: string, actions: [{actionName: string, actionPayload: any, contextId: string}]}>,
+  events: Array<{name: string, actions: [{actionName: string, actionPayload: string | ModifierFunction | null, contextId: string}]}>, // Modifier function will be injected with the event object, accessible via args[0].
 }
 
 export interface ProviderConfig {
   name: string,
-  actions: Array<{name: string, payload: any, reducerCode: string}>,
+  actions: Array<{name: string, reducerCode: string}>,
   initialState: any,
 }
 
@@ -69,10 +79,7 @@ export interface ProviderConfig {
 interface ProviderDependencyConfig {
   contextId: string, // must match the id of a node with a ProviderConfig
   selector: string[], // if accessing user.name then this would be ['user', 'name']
-  modifier: {
-    args: string[],
-    body: string,
-  } | null,
+  modifier: ModifierFunction | null, // Modifier will be injected with the value from the context, accessible via args[0]
 }
 \`\`\
 
@@ -159,12 +166,10 @@ const upDownCounterSample = {
         "actions": [
           {
             "name": "increment",
-            "payload": null,
             "reducerCode": "return { ...state, count: state.count + 1 };"
           },
           {
             "name": "decrement",
-            "payload": null,
             "reducerCode": "return { ...state, count: state.count - 1 };"
           }
         ],
@@ -213,8 +218,7 @@ const upDownCounterSample = {
                     "contextId": "1",
                     "selector": ['count'],
                     "modifier": {
-                      args: ['count'],
-                      body: 'return count.toString();'
+                      'body': 'return args[0].toString();'
                     }
                   },
                   "className": "text-4xl"
@@ -260,17 +264,14 @@ const nameAndEmailFormSample = {
         "actions": [
           {
             "name": "updateName",
-            "payload": "$event.target.value",
             "reducerCode": "return { ...state, name: action.payload, validName: action.payload.trim().length > 0 };"
           },
           {
             "name": "updateEmail",
-            "payload": "$event.target.value",
             "reducerCode": "return { ...state, email: action.payload, validEmail: action.payload.trim().length > 0 && action.payload.match(/.+@.+/) };"
           },
           {
             "name": "submitForm",
-            "payload": null,
             "reducerCode": "if (state.name && state.email) { alert('Form submitted successfully!'); return { name: '', email: '' }; } else { return state; }"
           }
         ],
@@ -327,7 +328,9 @@ const nameAndEmailFormSample = {
                     "actions": [
                       {
                         "actionName": "updateName",
-                        "actionPayload": null,
+                        "actionPayload": {
+                          "body": "return args[0].target.value;",
+                        },
                         "contextId": "root"
                       }
                     ]
@@ -382,7 +385,9 @@ const nameAndEmailFormSample = {
                         "actions": [
                           {
                             "actionName": "updateEmail",
-                            "actionPayload": null,
+                            "actionPayload": {
+                              "body": "return args[0].target.value;",
+                            },
                             "contextId": "root"
                           }
                         ]
@@ -401,7 +406,7 @@ const nameAndEmailFormSample = {
                         "selector": null,
                         "modifier": {
                           "args": ["state"],
-                          "body": "return state.validName && state.evalidEmail ? 'hidden' : 'inline';"
+                          "body": "return state.validName && state.validEmail ? 'hidden' : 'inline';"
                         }
                       },
                       "textContent": "You must provide a valid name and email."

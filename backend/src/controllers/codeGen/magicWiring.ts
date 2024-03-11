@@ -47,27 +47,34 @@ Always create new ids for new nodes. Do NOT reuse ids. For example, if you are a
 
 Sometimes no work is required and in that case you may return an empty string to signify no work is necessary.
 
-\`\`\`json
+\`\`\`tsx
+// Use modifiers for string interpolation or running functions.
+// For example, if you want to access document.getElementById('todoInput').value
+// you can use a modifier like this: 
+// {body: 'return document.getElementById("todoInput").value;'}
+interface ModifierFunction {
+  body: string,
+}
+
+// Example of event names: onClick, onBlur, onMouseDown, onKeyDown, etc.
+// Example of attributes: Classname, textContent, type, etc.
 export interface ComponentConfig {
-  type: string,
+  type: 'button' | 'label' | 'textarea' | 'div' | 'input',
   attributes: Record<string, string | ProviderDependencyConfig>,
-  events: Array<{name: string, actions: [{actionName: string, actionPayload: any, contextId: string}]}>,
+  events: Array<{name: string, actions: [{actionName: string, actionPayload: string | ModifierFunction | null, contextId: string}]}>, // Modifier function will be injected with the event object, accessible via args[0].
 }
 
 export interface ProviderConfig {
   name: string,
-  actions: Array<{name: string, payload: any, reducerCode: string}>,
+  actions: Array<{name: string, reducerCode: string}>,
   initialState: any,
 }
 
 // Helper interface
 interface ProviderDependencyConfig {
-  contextId: string,
-  selector: string[],
-  modifier: {
-    args: string[],
-    body: string,
-  } | null,
+  contextId: string, // must match the id of a node with a ProviderConfig
+  selector: string[], // if accessing user.name then this would be ['user', 'name']
+  modifier: ModifierFunction | null, // Modifier will be injected with the value from the context, accessible via args[0]
 }
 \`\`\
 
@@ -135,12 +142,10 @@ const magicWiringSolutionOne = {
         "actions": [
           {
             "name": "increment",
-            "payload": null,
             "reducerCode": "return { ...state, count: state.count + 1 };"
           },
           {
             "name": "decrement",
-            "payload": null,
             "reducerCode": "return { ...state, count: state.count - 1 };"
           }
         ],
@@ -179,8 +184,7 @@ const magicWiringSolutionOne = {
                 "contextId": "1",
                 "selector": ['count'],
                 "modifier": {
-                  args: ['count'],
-                  body: 'return count.toString();'
+                  'body': 'return args[0].toString();'
                 }
               }
             },

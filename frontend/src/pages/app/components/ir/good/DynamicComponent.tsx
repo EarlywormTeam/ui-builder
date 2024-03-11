@@ -1,6 +1,6 @@
 import React, { PropsWithChildren, useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { ComponentConfig, ProviderDependencyConfig } from "./config";
+import { ComponentConfig, ProviderDependencyConfig, ModifierFunction } from "./config";
 import { DynamicContextConsumer } from "./DynamicContextConsumer";
 import { useComponent } from './useComponent';
 import withDraggable from "../../DraggableComponent";
@@ -26,6 +26,18 @@ const extractContextIdsFromAttributes = (attributes: Record<string, ProviderDepe
     .map(a => a.contextId);
 }
 
+const parseActionPayload = (event: React.MouseEvent, actionPayload: string | ModifierFunction | null) => {
+  if (actionPayload) {
+    if (typeof actionPayload === 'string') {
+      return JSON.parse(actionPayload);
+    } else {
+      // eslint-disable-next-line no-new-func
+      return Function('args', actionPayload.body)([event]);
+    }
+  }
+  return null;
+}
+
 // attributes can be either a string or a ProviderDependencyConfig.
 // If they are a ProviderDependencyConfig, we can use the context to
 // get the value.
@@ -49,7 +61,7 @@ interface EventConfig {
 interface ActionConfig {
   contextId: string;
   actionName: string;
-  actionPayload?: string;
+  actionPayload: string | ModifierFunction | null;
 }
 
 interface Contexts {
@@ -71,7 +83,7 @@ const convertEventHandlers = (
           if (contexts[action.contextId] && typeof contexts[action.contextId].dispatch === 'function') {
             contexts[action.contextId].dispatch({
               type: action.actionName,
-              payload: action.actionPayload ? JSON.parse(action.actionPayload) : null,
+              payload: parseActionPayload(event, action.actionPayload),
             });
           } else {
             console.error(`Context with id ${action.contextId} not found or dispatch not a function`);
@@ -248,7 +260,7 @@ const convertProviderDependencyConfigToString = (contexts: any, config: Provider
   }
   if (config.modifier) {
     // eslint-disable-next-line no-new-func
-    attValue = Function(...config.modifier.args, config.modifier.body)(attValue);
+    attValue = Function('args', config.modifier.body)([attValue]);
   }
   return attValue;
 }
