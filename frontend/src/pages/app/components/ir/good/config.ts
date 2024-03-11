@@ -3,20 +3,21 @@ export interface EffectConfig {
   actions: Array<{actionName: string, actionPayload: any, contextId: string}>,
 }
 
-export interface ModifierFunction {
+export interface FunctionConfig {
+  args: Array<ProviderDependencyConfig>,
   body: string,
 }
 
 export interface ProviderDependencyConfig {
   contextId: string,
   selector: string[],
-  modifier: ModifierFunction | null,
+  modifier: FunctionConfig | null,
 }
 
 export interface ComponentConfig {
   type: string,
-  attributes: Record<string, string | ProviderDependencyConfig>,
-  events: Array<{name: string, actions: [{actionName: string, actionPayload: string | ModifierFunction | null, contextId: string}]}>,
+  attributes: Record<string, string | FunctionConfig>,
+  events: Array<{name: string, actions: [{actionName: string, actionPayload: string | FunctionConfig | null, contextId: string}]}>,
 }
 
 export interface ProviderConfig {
@@ -25,4 +26,14 @@ export interface ProviderConfig {
   initialState: any,
 }
 
-// You will have a provider with a hook into a lookup table for id -> config.
+export interface ListConfig {
+  generator: ProviderDependencyConfig,
+  template: ProviderConfig | ComponentConfig, 
+}
+
+export interface ConditionalConfig {
+  condition: Function,
+  true: ProviderConfig | ComponentConfig | ListConfig | ConditionalConfig,
+  false: ProviderConfig | ComponentConfig | ListConfig | ConditionalConfig,
+}
+

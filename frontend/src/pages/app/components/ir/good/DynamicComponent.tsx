@@ -1,6 +1,6 @@
 import React, { PropsWithChildren, useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { ComponentConfig, ProviderDependencyConfig, ModifierFunction } from "./config";
+import { ComponentConfig, ProviderDependencyConfig, FunctionConfig } from "./config";
 import { DynamicContextConsumer } from "./DynamicContextConsumer";
 import { useComponent } from './useComponent';
 import withDraggable from "../../DraggableComponent";
@@ -20,34 +20,43 @@ const extractContextIdsFromEvents = (events: { actions: { contextId: string }[] 
     .flat())]; // Flatten and then remove duplicates using Set
 }
 
-const extractContextIdsFromAttributes = (attributes: Record<string, ProviderDependencyConfig | string>) => {
+const extractContextIdsFromAttributes = (attributes: Record<string, FunctionConfig | string>) => {
   return Object.values(attributes)
-    .filter((a): a is ProviderDependencyConfig => typeof a !== 'string')
-    .map(a => a.contextId);
+    .filter((a): a is FunctionConfig => typeof a !== 'string')
+    .map(a => a.args.map(ad => ad.contextId))
+    .reduce((acc, val) => acc.concat(val), []);
 }
 
-const parseActionPayload = (event: React.MouseEvent, actionPayload: string | ModifierFunction | null) => {
+const parseActionPayload = (event: React.MouseEvent, contexts: Record<string, any>, actionPayload: string | FunctionConfig | null) => {
   if (actionPayload) {
     if (typeof actionPayload === 'string') {
       return JSON.parse(actionPayload);
     } else {
-      // eslint-disable-next-line no-new-func
-      return Function('args', actionPayload.body)([event]);
+      return executeFunctionConfig({event}, contexts, actionPayload);
     }
   }
   return null;
 }
 
-// attributes can be either a string or a ProviderDependencyConfig.
-// If they are a ProviderDependencyConfig, we can use the context to
+const executeFunctionConfig = (scope: Record<string, any>, contexts: Record<string, string>, func: FunctionConfig) => {
+  let args = [];
+  if (func.args) {
+    args = func.args.map((a: ProviderDependencyConfig) => convertProviderDependencyConfigToValue(contexts, a));
+  } 
+  // eslint-disable-next-line no-new-func
+  return Function(...Object.keys(scope), 'args', func.body)(...Object.values(scope), args);
+}
+
+// attributes can be either a string or a FunctionConfig.
+// If they are a FunctionConfig, we can use the context to
 // get the value.
-const resolveAttributes = (attributes: Record<string, ProviderDependencyConfig | string>, contexts: Record<string, any>): Record<string, string> => {
+const resolveAttributes = (attributes: Record<string, FunctionConfig | string>, contexts: Record<string, any>): Record<string, string> => {
   return Object.keys(attributes).reduce((acc: Record<string, string>, key: string) => {
     const value = attributes[key];
     if (typeof value === 'string' || !value) {
       acc[key] = value;
     } else {
-      acc[key] = convertProviderDependencyConfigToString(contexts, value);
+      acc[key] = executeFunctionConfig({}, contexts, value); 
     }
     return acc;
   }, {});
@@ -61,7 +70,7 @@ interface EventConfig {
 interface ActionConfig {
   contextId: string;
   actionName: string;
-  actionPayload: string | ModifierFunction | null;
+  actionPayload: string | FunctionConfig | null;
 }
 
 interface Contexts {
@@ -83,7 +92,7 @@ const convertEventHandlers = (
           if (contexts[action.contextId] && typeof contexts[action.contextId].dispatch === 'function') {
             contexts[action.contextId].dispatch({
               type: action.actionName,
-              payload: parseActionPayload(event, action.actionPayload),
+              payload: parseActionPayload(event, contexts, action.actionPayload),
             });
           } else {
             console.error(`Context with id ${action.contextId} not found or dispatch not a function`);
@@ -237,7 +246,7 @@ export const DynamicComponent: React.FC<PropsWithChildren<{id: string, config: C
               hasChildren={childrenIds.length > 0}
               childrenIds={childrenIds}
               isEditing={isEditing}
-              editContent={typeof editContent !== 'object' ? editContent : convertProviderDependencyConfigToString(contexts, editContent)}
+              editContent={typeof editContent !== 'object' ? editContent : executeFunctionConfig({}, contexts, editContent)}
               content={attributes.textcontent || ''}
               setEditContent={setEditContent}
               setIsEditing={setIsEditing}
@@ -252,7 +261,7 @@ export const DynamicComponent: React.FC<PropsWithChildren<{id: string, config: C
   );
 }
 
-const convertProviderDependencyConfigToString = (contexts: any, config: ProviderDependencyConfig) => {
+const convertProviderDependencyConfigToValue = (contexts: any, config: ProviderDependencyConfig) => {
   const contextValue = contexts[config.contextId]['state'];
   let attValue = contextValue;
   for (const sel of config.selector) {

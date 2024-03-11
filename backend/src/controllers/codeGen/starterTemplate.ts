@@ -53,20 +53,25 @@ Event actions must have an actionName and a contextId. The actionName must be th
 Sometimes no work is required and in that case you may return an empty string to signify no work is necessary.
 
 \`\`\`tsx
-// Use modifiers for string interpolation or running functions.
+// Use functions for string interpolation or running functions.
 // For example, if you want to access document.getElementById('todoInput').value
 // you can use a modifier like this: 
-// {body: 'return document.getElementById("todoInput").value;'}
-interface ModifierFunction {
+// {args: [], body: 'return document.getElementById("todoInput").value;'}
+// Args are accessible within the function on the variable \`args\`.
+// Ror example, the object below would check that a name value from 
+// context with id 1 has a length greater than 0.
+// {args: [{contextId: '1', selector: ['name'], modifier: null}], body: 'return args[0].length > 0;'}
+interface FunctionConfig {
+  args: Array<ProviderDepenendencyConfig>,
   body: string,
 }
 
 // Example of event names: onClick, onBlur, onMouseDown, onKeyDown, etc.
-// Example of attributes: Classname, textContent, type, etc.
+// Example of attributes: Classname, textcontent, type, etc.
 export interface ComponentConfig {
   type: 'button' | 'label' | 'textarea' | 'div' | 'input',
-  attributes: Record<string, string | ProviderDependencyConfig>,
-  events: Array<{name: string, actions: [{actionName: string, actionPayload: string | ModifierFunction | null, contextId: string}]}>, // Modifier function will be injected with the event object, accessible via args[0].
+  attributes: Record<string, string | FunctionConfig>,
+  events: Array<{name: string, actions: [{actionName: string, actionPayload: string | FunctionConfig | null, contextId: string}]}>, // FunctionConfig.body can access the event object through variable \`event\`.
 }
 
 export interface ProviderConfig {
@@ -79,7 +84,7 @@ export interface ProviderConfig {
 interface ProviderDependencyConfig {
   contextId: string, // must match the id of a node with a ProviderConfig
   selector: string[], // if accessing user.name then this would be ['user', 'name']
-  modifier: ModifierFunction | null, // Modifier will be injected with the value from the context, accessible via args[0]
+  modifier: FunctionConfig | null, // FunctionConfig.body can access the value from the context through the variable \`value\`.
 }
 \`\`\
 
@@ -182,7 +187,7 @@ const upDownCounterSample = {
           "id": "2",
           "config": {
             "type": "button",
-            "attributes": {"textContent": "+", "variant": "default", "size": "sm"},
+            "attributes": {"textcontent": "+", "variant": "default", "size": "sm"},
             "events": [
               {
                 "name": "onClick",
@@ -213,13 +218,13 @@ const upDownCounterSample = {
               "config": {
                 "type": "label",
                 "attributes": {
-                  "textContent": 
+                  "textcontent": 
                   {
-                    "contextId": "1",
-                    "selector": ['count'],
-                    "modifier": {
-                      'body': 'return args[0].toString();'
-                    }
+                    'args': [{
+                      "contextId": "1",
+                      "selector": ['count'],
+                    }],
+                    'body': 'return args[0].toString();'
                   },
                   "className": "text-4xl"
                 },
@@ -233,7 +238,7 @@ const upDownCounterSample = {
           "id": "5",
           "config": {
             "type": "button",
-            "attributes": {"textContent": "-", "variant": "destructive", "size": "sm"},
+            "attributes": {"textcontent": "-", "variant": "destructive", "size": "sm"},
             "events": [
               {
                 "name": "onClick",
@@ -289,7 +294,7 @@ const nameAndEmailFormSample = {
             "type": "div",
             "attributes": {
               "className": "w-full max-w-md",
-              "textContent": ""
+              "textcontent": ""
             },
             "events": []
           },
@@ -299,7 +304,7 @@ const nameAndEmailFormSample = {
               "config": {
                 "type": "label",
                 "attributes": {
-                  "textContent": "Name",
+                  "textcontent": "Name",
                   "className": "block text-sm font-medium leading-none mb-2"
                 },
                 "events": []
@@ -314,7 +319,7 @@ const nameAndEmailFormSample = {
                   "type": "text",
                   "placeholder": "Your name",
                   "required": "true",
-                  "textContent": {
+                  "textcontent": {
                     "contextId": "root",
                     "selector": [
                       "name"
@@ -329,7 +334,8 @@ const nameAndEmailFormSample = {
                       {
                         "actionName": "updateName",
                         "actionPayload": {
-                          "body": "return args[0].target.value;",
+                          "args": [],
+                          "body": "return event.target.value;",
                         },
                         "contextId": "root"
                       }
@@ -345,7 +351,7 @@ const nameAndEmailFormSample = {
                 "type": "div",
                 "attributes": {
                   "className": "w-full max-w-md",
-                  "textContent": ""
+                  "textcontent": ""
                 },
                 "events": []
               },
@@ -355,7 +361,7 @@ const nameAndEmailFormSample = {
                   "config": {
                     "type": "label",
                     "attributes": {
-                      "textContent": "Email",
+                      "textcontent": "Email",
                       "className": "block text-sm font-medium leading-none mb-2"
                     },
                     "events": []
@@ -371,7 +377,7 @@ const nameAndEmailFormSample = {
                       "placeholder": "Your email",
                       "required": "true",
                       "pattern": ".+@.+",
-                      "textContent": {
+                      "textcontent": {
                         "contextId": "root",
                         "selector": [
                           "email"
@@ -386,7 +392,8 @@ const nameAndEmailFormSample = {
                           {
                             "actionName": "updateEmail",
                             "actionPayload": {
-                              "body": "return args[0].target.value;",
+                              "args": [],
+                              "body": "return event.target.value;",
                             },
                             "contextId": "root"
                           }
@@ -402,14 +409,14 @@ const nameAndEmailFormSample = {
                     "type": "label",
                     "attributes": {
                       "className": {
-                        "contextId": "root",
-                        "selector": null,
-                        "modifier": {
-                          "args": ["state"],
-                          "body": "return state.validName && state.validEmail ? 'hidden' : 'inline';"
-                        }
+                        "args": [{
+                          "contextId": "root",
+                          "selector": null,
+                          "modifier": null
+                        }],
+                        "body": "return state.validName && state.validEmail ? 'hidden' : 'inline';"
                       },
-                      "textContent": "You must provide a valid name and email."
+                      "textcontent": "You must provide a valid name and email."
                     },
                     "events": []
                   },
@@ -420,7 +427,7 @@ const nameAndEmailFormSample = {
                   "config": {
                     "type": "button",
                     "attributes": {
-                      "textContent": "Submit",
+                      "textcontent": "Submit",
                       "variant": "default",
                       "size": "default",
                       "type": "submit",

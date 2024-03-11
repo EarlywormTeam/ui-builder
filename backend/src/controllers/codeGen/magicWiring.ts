@@ -48,11 +48,16 @@ Always create new ids for new nodes. Do NOT reuse ids. For example, if you are a
 Sometimes no work is required and in that case you may return an empty string to signify no work is necessary.
 
 \`\`\`tsx
-// Use modifiers for string interpolation or running functions.
+// Use functions for string interpolation or running functions.
 // For example, if you want to access document.getElementById('todoInput').value
 // you can use a modifier like this: 
-// {body: 'return document.getElementById("todoInput").value;'}
-interface ModifierFunction {
+// {args: [], body: 'return document.getElementById("todoInput").value;'}
+// Args are accessible within the function on the variable \`args\`.
+// Ror example, the object below would check that a name value from 
+// context with id 1 has a length greater than 0.
+// {args: [{contextId: '1', selector: ['name'], modifier: null}], body: 'return args[0].length > 0;'}
+interface FunctionConfig {
+  args: Array<ProviderDepenendencyConfig>,
   body: string,
 }
 
@@ -60,8 +65,8 @@ interface ModifierFunction {
 // Example of attributes: Classname, textContent, type, etc.
 export interface ComponentConfig {
   type: 'button' | 'label' | 'textarea' | 'div' | 'input',
-  attributes: Record<string, string | ProviderDependencyConfig>,
-  events: Array<{name: string, actions: [{actionName: string, actionPayload: string | ModifierFunction | null, contextId: string}]}>, // Modifier function will be injected with the event object, accessible via args[0].
+  attributes: Record<string, string | FunctionConfig>,
+  events: Array<{name: string, actions: [{actionName: string, actionPayload: string | FunctionConfig | null, contextId: string}]}>, // FunctionConfig.body can access the event object through variable \`event\`.
 }
 
 export interface ProviderConfig {
@@ -74,7 +79,7 @@ export interface ProviderConfig {
 interface ProviderDependencyConfig {
   contextId: string, // must match the id of a node with a ProviderConfig
   selector: string[], // if accessing user.name then this would be ['user', 'name']
-  modifier: ModifierFunction | null, // Modifier will be injected with the value from the context, accessible via args[0]
+  modifier: FunctionConfig | null, // FunctionConfig.body can access the value from the context through the variable \`value\`.
 }
 \`\`\
 
@@ -181,11 +186,12 @@ const magicWiringSolutionOne = {
             "attributes": {
               "textContent": 
               {
-                "contextId": "1",
-                "selector": ['count'],
-                "modifier": {
-                  'body': 'return args[0].toString();'
-                }
+                'args': [{
+                  'contextId': '1',
+                  'selector': ['count'],
+                  'modifier': null
+                }],
+                'body': "return args[0].toString();",
               }
             },
             "events": [],
