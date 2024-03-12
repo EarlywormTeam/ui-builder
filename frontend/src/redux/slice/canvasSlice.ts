@@ -219,7 +219,6 @@ const canvasSlice = createSlice({
     },
     insertChild: (state, action: PayloadAction<{ id: string; parentId: string; index: number | null }>) => {
       const { id, parentId, index } = action.payload;
-      console.log('insert child', id, parentId, index);
       updatePresentState(state, () => _insertId(id, parentId, index, state));
     },
     deleteId: (state, action: PayloadAction<{ id: string }>) => {
@@ -235,7 +234,6 @@ const canvasSlice = createSlice({
     },
     removeId: (state, action: PayloadAction<{ id: string }>) => {
       const { id } = action.payload;
-      console.log('removeId', id);
       updatePresentState(state, () => _removeId(id, state));
     },
     setNewConfigTree: (state, action: PayloadAction<{ configTree: any }>) => {

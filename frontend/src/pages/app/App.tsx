@@ -4,7 +4,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from 'src/redux/store';
 import ComponentMenu from './components/ComponentMenu'; // Your component menu component
 import Canvas from './components/Canvas'; // Your canvas component
-import { add, deleteSelected, insertChild, removeId } from 'src/redux/slice/canvasSlice';
+import { add, deleteSelected, insertChild, removeId, setSelectedIds } from 'src/redux/slice/canvasSlice';
 import ProjectStartModal from './components/ProjectStartModal';
 import ComponentMap from './components/ComponentMap';
 import { DynamicElement } from './components/ir/good/DynamicElement';
@@ -33,6 +33,12 @@ const DragAndDrop = () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [dispatch]);
+
+  useEffect(() => {
+    if (isPreview) {
+      dispatch(setSelectedIds([]));
+    }
+  }, [dispatch, isPreview]);
 
   const onDragStart = (event: { active: { id: string; children?: React.ReactNode[] } }) => {
     setActiveId(event.active.id);
