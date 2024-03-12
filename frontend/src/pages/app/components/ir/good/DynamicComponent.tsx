@@ -14,10 +14,16 @@ const useIsSelected = (id: string) => {
   return selectedIds.includes(id);
 }
 
-const extractContextIdsFromEvents = (events: { actions: { contextId: string }[] }[]) => {
+const extractContextIdsFromEvents = (events: { actions: { contextId: string, actionPayload: { args: Array<{ contextId: string }>} | string | null }[] }[]) => {
   return [...new Set(events
-    .map(e => e.actions.map(a => a.contextId))
-    .flat())]; // Flatten and then remove duplicates using Set
+    .map(e => e.actions.map(a => {
+      const payloadFunction = typeof a.actionPayload === 'object' ? a.actionPayload as FunctionConfig : null;
+      if (!payloadFunction) {
+        return [a.contextId];
+      }
+      return [a.contextId].concat(payloadFunction.args.map(ad => ad.contextId));
+    }))
+    .flat(2))]; // Flatten and then remove duplicates using Set
 }
 
 const extractContextIdsFromAttributes = (attributes: Record<string, FunctionConfig | string>) => {
@@ -27,12 +33,12 @@ const extractContextIdsFromAttributes = (attributes: Record<string, FunctionConf
     .reduce((acc, val) => acc.concat(val), []);
 }
 
-const parseActionPayload = (event: React.MouseEvent, contexts: Record<string, any>, actionPayload: string | FunctionConfig | null) => {
+const parseActionPayload = (key: string | undefined, event: React.MouseEvent, contexts: Record<string, any>, actionPayload: string | FunctionConfig | null) => {
   if (actionPayload) {
     if (typeof actionPayload === 'string') {
       return JSON.parse(actionPayload);
     } else {
-      return executeFunctionConfig({event}, contexts, actionPayload);
+      return executeFunctionConfig({event, listIndex: isNaN(Number(key)) ? undefined : Number(key)}, contexts, actionPayload);
     }
   }
   return null;
@@ -43,6 +49,7 @@ const executeFunctionConfig = (scope: Record<string, any>, contexts: Record<stri
   if (func.args) {
     args = func.args.map((a: ProviderDependencyConfig) => convertProviderDependencyConfigToValue(contexts, a));
   } 
+  console.log(scope, args, func.body);
   // eslint-disable-next-line no-new-func
   return Function(...Object.keys(scope), 'args', func.body)(...Object.values(scope), args);
 }
@@ -50,13 +57,13 @@ const executeFunctionConfig = (scope: Record<string, any>, contexts: Record<stri
 // attributes can be either a string or a FunctionConfig.
 // If they are a FunctionConfig, we can use the context to
 // get the value.
-const resolveAttributes = (attributes: Record<string, FunctionConfig | string>, contexts: Record<string, any>): Record<string, string> => {
-  return Object.keys(attributes).reduce((acc: Record<string, string>, key: string) => {
-    const value = attributes[key];
+const resolveAttributes = (key: string | undefined, attributes: Record<string, FunctionConfig | string>, contexts: Record<string, any>): Record<string, string> => {
+  return Object.keys(attributes).reduce((acc: Record<string, string>, okey: string) => {
+    const value = attributes[okey];
     if (typeof value === 'string' || !value) {
-      acc[key] = value;
+      acc[okey] = value;
     } else {
-      acc[key] = executeFunctionConfig({}, contexts, value); 
+      acc[okey] = executeFunctionConfig({listIndex: isNaN(Number(key)) ? undefined : Number(key)}, contexts, value); 
     }
     return acc;
   }, {});
@@ -80,6 +87,7 @@ interface Contexts {
 }
 
 const convertEventHandlers = (
+  key: string | undefined,
   events: EventConfig[],
   contexts: Contexts
 ): Record<string, React.MouseEventHandler<HTMLElement>> => {
@@ -92,7 +100,7 @@ const convertEventHandlers = (
           if (contexts[action.contextId] && typeof contexts[action.contextId].dispatch === 'function') {
             contexts[action.contextId].dispatch({
               type: action.actionName,
-              payload: parseActionPayload(event, contexts, action.actionPayload),
+              payload: parseActionPayload(key, event, contexts, action.actionPayload),
             });
           } else {
             console.error(`Context with id ${action.contextId} not found or dispatch not a function`);
@@ -105,7 +113,7 @@ const convertEventHandlers = (
   return convertedHandlers;
 };
 
-export const DynamicComponent: React.FC<PropsWithChildren<{id: string, config: ComponentConfig, childrenIds: string[], draggable: boolean, droppable: boolean, mode?: 'preview' | 'editing'} & React.HTMLAttributes<HTMLElement>>> = ({id, config, childrenIds, draggable, droppable, children, mode, ...props}) => {
+export const DynamicComponent: React.FC<PropsWithChildren<{id: string, listIndex: string | undefined, config: ComponentConfig, childrenIds: string[], draggable: boolean, droppable: boolean, mode?: 'preview' | 'editing'} & React.HTMLAttributes<HTMLElement>>> = ({id, listIndex, config, childrenIds, draggable, droppable, children, mode, ...props}) => {
   const displayMode = mode || 'preview';
   const dispatch = useDispatch();
   const [isEditing, setIsEditing] = useState(false);
@@ -209,6 +217,7 @@ export const DynamicComponent: React.FC<PropsWithChildren<{id: string, config: C
 
   const Component = useComponent(config.type);
   if (!Component) {
+    console.error('Comonent not found', id, config);
     return null;
   }
 
@@ -216,8 +225,8 @@ export const DynamicComponent: React.FC<PropsWithChildren<{id: string, config: C
     <DynamicContextConsumer
       contextIds={contextIds}
       render={(contexts) => {
-        const attributes = resolveAttributes(config.attributes, contexts);
-        let convertedHandlers = convertEventHandlers(config.events, contexts);
+        const attributes = resolveAttributes(listIndex, config.attributes, contexts);
+        let convertedHandlers = convertEventHandlers(listIndex, config.events, contexts);
         if (onMouseDown) {
           convertedHandlers['onMouseDown'] = onMouseDown;
           convertedHandlers['onTouchStart'] = onMouseDown;
@@ -232,21 +241,22 @@ export const DynamicComponent: React.FC<PropsWithChildren<{id: string, config: C
         const WrappedComponent = withDragAndDrop(draggable, adjDroppable, Component);
 
         if (config.type === 'textarea' || config.type === 'input') {
-          return <WrappedComponent id={id} {...convertedHandlers} {...config.attributes} {...props}/>;
+          return <WrappedComponent id={id} {...convertedHandlers} {...attributes} {...props}/>;
         }
 
         const atts = {
-          ...config.attributes,
-          className: localIsSelected ? `${config.attributes.className || ''} shadow-xl outline outline-2 outline-offset-2 outline-blue-500 transform scale-103` : config.attributes.className
+          ...attributes,
+          className: localIsSelected ? `${attributes.className || ''} shadow-xl outline outline-2 outline-offset-2 outline-blue-500 transform scale-103` : attributes.className
         }
 
         return (
-          <WrappedComponent id={id} {...convertedHandlers} {...atts} {...props}>
+          <WrappedComponent id={id} listIndex={listIndex} {...convertedHandlers} {...atts} {...props}>
             <Filler
+              listIndex={listIndex}
               hasChildren={childrenIds.length > 0}
               childrenIds={childrenIds}
               isEditing={isEditing}
-              editContent={typeof editContent !== 'object' ? editContent : executeFunctionConfig({}, contexts, editContent)}
+              editContent={typeof editContent !== 'object' ? editContent : executeFunctionConfig({listIndex: isNaN(Number(listIndex)) ? undefined : Number(listIndex)}, contexts, editContent)}
               content={attributes.textcontent || ''}
               setEditContent={setEditContent}
               setIsEditing={setIsEditing}
@@ -287,6 +297,7 @@ const withDragAndDrop = (drag: boolean, drop: boolean, Comp: React.ElementType) 
 };
 
 interface FillerProps {
+  listIndex: string | undefined;
   hasChildren: boolean;
   childrenIds: string[];
   isEditing: boolean;
@@ -299,11 +310,11 @@ interface FillerProps {
   displayMode: 'preview' | 'editing' | undefined;
 }
 
-const Filler: React.FC<FillerProps> = ({ hasChildren, childrenIds, isEditing, editContent, setEditContent, content, setIsEditing, draggable, droppable, displayMode }) => {
+const Filler: React.FC<FillerProps> = ({ listIndex, hasChildren, childrenIds, isEditing, editContent, setEditContent, content, setIsEditing, draggable, droppable, displayMode }) => {
   if (hasChildren) {
     return (
       <>
-        {childrenIds.map((cid: string) => <DynamicElement key={cid} id={cid} draggable={draggable} droppable={droppable} mode={displayMode} />)}
+        {childrenIds.map((cid: string) => <DynamicElement listIndex={listIndex} id={cid} draggable={draggable} droppable={droppable} mode={displayMode} key={listIndex + cid} />)}
       </>
     );
   } else if (isEditing) {

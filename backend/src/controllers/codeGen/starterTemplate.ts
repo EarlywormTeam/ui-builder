@@ -3,7 +3,7 @@ import * as LLM from '../../services/llm';
 
 export const genStarterTemplate = async (ctx: Context) => {
   const { projectDescription } = ctx.request.body as {projectDescription: string};
-  const messages: LLM.LlmMessage[] = [{role: "system", content: magicPaintSystemPrompt}, {role: "user", content: "An up down counter application."}, {role: "assistant", content: JSON.stringify(upDownCounterSample)}, {role: "user", content: "A form with required name and email fields. Email must be valid (contain an '@' character). There's a submit button."}, {role: "assistant", content: JSON.stringify(nameAndEmailFormSample)}, {role: "user", content: projectDescription}];
+  const messages: LLM.LlmMessage[] = [{role: "system", content: magicPaintSystemPrompt}, {role: "user", content: "An up down counter application."}, {role: "assistant", content: JSON.stringify(upDownCounterSample)}, {role: "user", content: "A form with required name and email fields. Email must be valid (contain an '@' character). There's a submit button."}, {role: "assistant", content: JSON.stringify(nameAndEmailFormSample)}, {role: "user", content: 'A todo list app'}, {role: 'assistant', content: JSON.stringify(todoListSample)}, {role: "user", content: projectDescription}];
   const resMessage = await LLM.queryLlmWithJsonValidation(messages, (json) => true, 'gpt-4-0125-preview');
   console.log(JSON.stringify(JSON.parse(resMessage.content), null, 2));
   ctx.body = {configTree: JSON.parse(resMessage.content)};
@@ -61,23 +61,31 @@ Sometimes no work is required and in that case you may return an empty string to
 // Ror example, the object below would check that a name value from 
 // context with id 1 has a length greater than 0.
 // {args: [{contextId: '1', selector: ['name'], modifier: null}], body: 'return args[0].length > 0;'}
+// FunctionConfig's body always has the listIndex in scope if the FunctionConfig is being executed on the child of a ListConfig. This makes it easy to get the value of the current list item, for example \`{args: [{contextId: '1', selector: ['todos'], modifier: null}], body: 'return args[0][listIndex];'}\` will give you the value of a todo in a list of todos.
 interface FunctionConfig {
   args: Array<ProviderDepenendencyConfig>,
   body: string,
 }
 
 // Example of event names: onClick, onBlur, onMouseDown, onKeyDown, etc.
-// Example of attributes: Classname, textcontent, type, etc.
+// Example of attributes: classname, textcontent, type, value, defaultValue, placeholder, etc.
 export interface ComponentConfig {
   type: 'button' | 'label' | 'textarea' | 'div' | 'input',
   attributes: Record<string, string | FunctionConfig>,
-  events: Array<{name: string, actions: [{actionName: string, actionPayload: string | FunctionConfig | null, contextId: string}]}>, // FunctionConfig.body can access the event object through variable \`event\`.
+  events: Array<{name: string, actions: [{actionName: string, actionPayload: string | FunctionConfig | null}]}>, // FunctionConfig.body can access the event object through variable \`event\`.
 }
 
 export interface ProviderConfig {
   name: string,
-  actions: Array<{name: string, reducerCode: string}>,
+  actions: Array<{name: string, reducerCode: string}>, // **IMPORTANT** do not place ';' semicolons inside of json objects where you should use ',' instead.
   initialState: any,
+}
+
+// A ListConfig is an abstract object that generates children. 
+// It should usually be wrapped in a container div to hold the components it generates.
+export interface ListConfig {
+  generator: FunctionConfig, // this should return a list of data that will be used to generate the list of nodes
+  listReusableChildConfig: ProviderConfig | ComponentConfig, // we will map over the output of the generator and return one config for every item from the generator.
 }
 
 // Helper interface
@@ -92,14 +100,16 @@ The interface for the ConfigTree is:
 \`\`\`json
 interface ConfigTree {
   id: string // must be unique
-  config: ComponentConfig | ProviderConfig
+  config: ComponentConfig | ProviderConfig | ListConfig
   children: ConfigTree[]
 }
 \`\`\`
 
-**IMPORTANT**: canvas is a reserved id for the root node. Do NOT use it as an id for any other node.
+**IMPORTANT**: The 'canvas' id is reserved for the root node. Do not alter this node and do not reuse the 'canvas' id anywhere in your config.
 
 Do NOT set values to be the width or height of the screen. Use h-full or w-full instead.
+
+Synchronize text inputs with a context provider's state. Do NOT use \`value\` without an \`onChange\` event handler, or else the input will be read-only.
 
 You are using components from the shadcn library. You have available the following components: 
 - button
@@ -223,6 +233,7 @@ const upDownCounterSample = {
                     'args': [{
                       "contextId": "1",
                       "selector": ['count'],
+                      "modifier": null,
                     }],
                     'body': 'return args[0].toString();'
                   },
@@ -319,17 +330,18 @@ const nameAndEmailFormSample = {
                   "type": "text",
                   "placeholder": "Your name",
                   "required": "true",
-                  "textcontent": {
-                    "contextId": "root",
-                    "selector": [
-                      "name"
-                    ],
-                    "modifier": null
+                  "value": {
+                    'args': [{
+                      "contextId": "root",
+                      "selector": ['name'],
+                      "modifier": null
+                    }],
+                    'body': 'return args[0];'
                   }
                 },
                 "events": [
                   {
-                    "name": "input",
+                    "name": "onChange",
                     "actions": [
                       {
                         "actionName": "updateName",
@@ -377,17 +389,18 @@ const nameAndEmailFormSample = {
                       "placeholder": "Your email",
                       "required": "true",
                       "pattern": ".+@.+",
-                      "textcontent": {
-                        "contextId": "root",
-                        "selector": [
-                          "email"
-                        ],
-                        "modifier": null
+                      "value": {
+                        'args': [{
+                          "contextId": "root",
+                          "selector": ['email'],
+                          "modifier": null
+                        }],
+                        'body': 'return args[0];'
                       }
                     },
                     "events": [
                       {
-                        "name": "input",
+                        "name": "onChange",
                         "actions": [
                           {
                             "actionName": "updateEmail",
@@ -455,3 +468,208 @@ const nameAndEmailFormSample = {
     }
   ]
 };
+
+const todoListSample = {
+  "id": "canvas",
+  "children": [
+    {
+      "id": "root",
+      "config": {
+        "name": "TodoList",
+        "actions": [
+          {
+            "name": "addTodo",
+            "reducerCode": "if (action.payload.trim() !== '') { return { ...state, todos: [...state.todos, action.payload], newTodo: '' }; } else { return state; }"
+          },
+          {
+            "name": "updateNewTodo",
+            "reducerCode": "return { ...state, newTodo: action.payload };"
+          },
+          {
+            "name": "removeTodo",
+            "reducerCode": "return { ...state, todos: state.todos.filter((_, index) => index !== action.payload) };"
+          }
+        ],
+        "initialState": {
+          "todos": [],
+          "newTodo": ""
+        }
+      },
+      "children": [
+        {
+          "id": "todoInputContainer",
+          "config": {
+            "type": "div",
+            "attributes": {
+              "className": "flex space-x-2"
+            },
+            "events": []
+          },
+          "children": [
+            {
+              "id": "todoInput",
+              "config": {
+                "type": "input",
+                "attributes": {
+                  "placeholder": "Add a new todo",
+                  "value": {
+                    "args": [
+                      {
+                        "contextId": "root",
+                        "selector": [
+                          "newTodo"
+                        ],
+                        "modifier": null
+                      }
+                    ],
+                    "body": "return args[0];"
+                  }
+                },
+                "events": [
+                  {
+                    "name": "onChange",
+                    "actions": [
+                      {
+                        "actionName": "updateNewTodo",
+                        "actionPayload": {
+                          "args": [],
+                          "body": "return event.target.value;"
+                        },
+                        "contextId": "root"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "children": []
+            },
+            {
+              "id": "addTodoButton",
+              "config": {
+                "type": "button",
+                "attributes": {
+                  "textcontent": "Add",
+                  "variant": "default",
+                  "size": "default"
+                },
+                "events": [
+                  {
+                    "name": "onClick",
+                    "actions": [
+                      {
+                        "actionName": "addTodo",
+                        "actionPayload": {
+                          "args": [
+                            {
+                              "contextId": "root",
+                              "selector": [
+                                "newTodo"
+                              ],
+                              "modifier": null
+                            }
+                          ],
+                          "body": "return args[0];"
+                        },
+                        "contextId": "root"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "todoListContainer",
+          "config": {
+            "type": "div",
+            "attributes": {
+              "className": "mt-4"
+            },
+            "events": []
+          },
+          "children": [
+            {
+              "id": "todoList",
+              "config": {
+                "generator": {
+                  "args": [
+                    {
+                      "contextId": "root",
+                      "selector": [
+                        "todos"
+                      ],
+                      "modifier": null
+                    }
+                  ],
+                  "body": "return args[0];"
+                },
+                "listReusableChildConfig": {
+                  "type": "div",
+                  "attributes": {
+                    "className": "flex justify-between items-center p-2 bg-gray-100 rounded mb-2"
+                  },
+                  "events": [],
+                  "children": [
+                    {
+                      "id": "todoItem",
+                      "config": {
+                        "type": "label",
+                        "attributes": {
+                          "textcontent": {
+                            "args": [
+                              {
+                                "contextId": "root",
+                                "selector": [
+                                  "todos"
+                                ],
+                                "modifier": null
+                              }
+                            ],
+                            "body": "return args[0][listIndex];"
+                          },
+                          "className": "text-sm"
+                        },
+                        "events": []
+                      },
+                      "children": []
+                    },
+                    {
+                      "id": "removeTodoButton",
+                      "config": {
+                        "type": "button",
+                        "attributes": {
+                          "textcontent": "Remove",
+                          "variant": "destructive",
+                          "size": "sm"
+                        },
+                        "events": [
+                          {
+                            "name": "onClick",
+                            "actions": [
+                              {
+                                "actionName": "removeTodo",
+                                "actionPayload": {
+                                  "args": [],
+                                  "body": "return listIndex;"
+                                },
+                                "contextId": "root"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              },
+              "children": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

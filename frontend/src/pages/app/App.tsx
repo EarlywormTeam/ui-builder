@@ -14,8 +14,9 @@ const DragAndDrop = () => {
   const dispatch = useDispatch();
   const [isPreview, setIsPreview] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const configMap = useSelector((state: RootState) => state.canvas.componentState.present.configMap);
-  const childrenMap = useSelector((state: RootState) => state.canvas.componentState.present.childrenMap);
+  const demoConfigMap = useSelector((state: RootState) => state.canvas.demoConfigMap);
+  // Be careful with this - since list updates the childrenMap in real time in preview mode, this has a conflict and causes bad re-renders.
+  // const childrenMap = useSelector((state: RootState) => state.canvas.componentState.present.childrenMap);
   const projectTemplateLoading = useSelector((state: RootState) => state.loading.projectTemplateLoading);
   
 
@@ -46,7 +47,7 @@ const DragAndDrop = () => {
       let newId = activeIdString;
       if (activeIdString.includes('__demo')) {
         const adjustedId = activeIdString.replace('__demo', '');
-        const newConfig = configMap[adjustedId];
+        const newConfig = demoConfigMap[adjustedId];
         newId = `comp-${Math.random().toString(36).substr(2, 9)}`;
         dispatch(add({id: newId, config: newConfig}));
       } else {
@@ -101,7 +102,7 @@ const DragAndDrop = () => {
               easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
             }}>
               {activeId ? (
-                <DynamicElement id={activeId} draggable={false} droppable={false} mode="preview" />
+                <DynamicElement id={activeId} listIndex={undefined} key={undefined} draggable={false} droppable={false} mode="preview" />
               ) : null}
             </DragOverlay>
           </div>

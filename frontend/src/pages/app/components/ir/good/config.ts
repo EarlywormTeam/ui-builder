@@ -27,8 +27,8 @@ export interface ProviderConfig {
 }
 
 export interface ListConfig {
-  generator: ProviderDependencyConfig,
-  template: ProviderConfig | ComponentConfig, 
+  generator: FunctionConfig,
+  listReusableChildConfig: ProviderConfig | ComponentConfig, 
 }
 
 export interface ConditionalConfig {

@@ -38,7 +38,7 @@ const ComponentList: React.FC = () => {
 
     let componentType = 'Canvas';
     if (id !== 'canvas') {
-      componentType = 'type' in componentConfig ? componentConfig.type : componentConfig.name;
+      componentType = 'type' in componentConfig ? componentConfig.type : 'name' in componentConfig ? componentConfig.name : 'List';
     }
 
     return (

@@ -60,23 +60,29 @@ Sometimes no work is required and in that case you may return an empty string to
 // Ror example, the object below would check that a name value from 
 // context with id 1 has a length greater than 0.
 // {args: [{contextId: '1', selector: ['name'], modifier: null}], body: 'return args[0].length > 0;'}
+// FunctionConfig's body always has the listIndex in scope if the FunctionConfig is being executed on the child of a ListConfig. This makes it easy to get the value of the current list item, for example \`{args: [{contextId: '1', selector: ['todos'], modifier: null}], body: 'return args[0][listIndex];'}\` will give you the value of a todo in a list of todos.
 interface FunctionConfig {
   args: Array<ProviderDepenendencyConfig>,
   body: string,
 }
 
 // Example of event names: onClick, onBlur, onMouseDown, onKeyDown, etc.
-// Example of attributes: Classname, textContent, type, etc.
+// Example of attributes: classname, textcontent, type, value, defaultValue, placeholder, etc.
 export interface ComponentConfig {
   type: 'button' | 'label' | 'textarea' | 'div' | 'input',
   attributes: Record<string, string | FunctionConfig>,
-  events: Array<{name: string, actions: [{actionName: string, actionPayload: string | FunctionConfig | null, contextId: string}]}>, // FunctionConfig.body can access the event object through variable \`event\`.
+  events: Array<{name: string, actions: [{actionName: string, actionPayload: string | FunctionConfig | null}]}>, // FunctionConfig.body can access the event object through variable \`event\`.
 }
 
 export interface ProviderConfig {
   name: string,
   actions: Array<{name: string, reducerCode: string}>,
   initialState: any,
+}
+
+export interface ListConfig {
+  generator: FunctionConfig, // this should return a list of data that will be used to generate the list of nodes
+  listReusableChildConfig: ProviderConfig | ComponentConfig, // we will map over the output of the generator and return one config for every item from the generator.
 }
 
 // Helper interface
@@ -96,7 +102,7 @@ interface ConfigTree {
 }
 \`\`\`
 
-**IMPORTANT**: canvas is a reserved id for the root node. Do NOT use it as an id for any other node.
+**IMPORTANT**: The 'canvas' id is reserved for the root node. Do not alter this node and do not reuse the 'canvas' id anywhere in your config.
 
 Do NOT set values to be the width or height of the screen. Use h-full or w-full instead.
 
@@ -186,7 +192,7 @@ const magicPaintExampleOne = {
           "id": "2",
           "config": {
             "type": "button",
-            "attributes": {"textContent": "+"},
+            "attributes": {"textcontent": "+"},
             "events": [
               {
                 "name": "onClick",
@@ -207,7 +213,7 @@ const magicPaintExampleOne = {
           "config": {
             "type": "label",
             "attributes": {
-              "textContent": 
+              "textcontent": 
               {
                 'args': [{
                   'contextId': '1',
@@ -225,7 +231,7 @@ const magicPaintExampleOne = {
           "id": "4",
           "config": {
             "type": "button",
-            "attributes": {"textContent": "-"},
+            "attributes": {"textcontent": "-"},
             "events": [
               {
                 "name": "onClick",
@@ -277,7 +283,7 @@ const magicPaintSolutionOne = {
           "id": "2",
           "config": {
             "type": "button",
-            "attributes": {"textContent": "+", "variant": "default", "size": "sm"},
+            "attributes": {"textcontent": "+", "variant": "default", "size": "sm"},
             "events": [
               {
                 "name": "onClick",
@@ -298,7 +304,7 @@ const magicPaintSolutionOne = {
           "config": {
             "type": "label",
             "attributes": {
-              "textContent": 
+              "textcontent": 
               {
                 'args': [{
                   'contextId': '1',
@@ -317,7 +323,7 @@ const magicPaintSolutionOne = {
           "id": "4",
           "config": {
             "type": "button",
-            "attributes": {"textContent": "-", "variant": "destructive", "size": "sm"},
+            "attributes": {"textcontent": "-", "variant": "destructive", "size": "sm"},
             "events": [
               {
                 "name": "onClick",

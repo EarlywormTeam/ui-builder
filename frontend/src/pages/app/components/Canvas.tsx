@@ -12,7 +12,9 @@ const Canvas = ({ isPreview }: { isPreview: boolean }) => {
   const childrenIds = useChildrenIds('canvas');
 
   const onClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    dispatch(setSelectedIds([]));
+    if (!isPreview) {
+      dispatch(setSelectedIds([]));
+    }
   }
 
   const CanvasContent = React.forwardRef<HTMLDivElement, React.PropsWithChildren<{}>>(({ children, ...props }, ref) => (
@@ -26,7 +28,7 @@ const Canvas = ({ isPreview }: { isPreview: boolean }) => {
   return (
     <DroppableCanvasContent id='canvas'>
       {childrenIds.length > 0 ? childrenIds.map((id: string) => 
-      <DynamicElement id={id} key={id} draggable={!isPreview} droppable={!isPreview} mode={isPreview ? 'preview' : 'editing'} />
+      <DynamicElement id={id} listIndex={undefined} key={id} draggable={!isPreview} droppable={!isPreview} mode={isPreview ? 'preview' : 'editing'} />
     ) : <p>No components to display</p>}
     </DroppableCanvasContent>
   );

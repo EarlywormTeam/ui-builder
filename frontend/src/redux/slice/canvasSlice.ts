@@ -1,12 +1,12 @@
 import { createContext } from 'react';
 import { PayloadAction, createSlice } from '@reduxjs/toolkit';
-import { ComponentConfig, ProviderConfig } from '../../pages/app/components/ir/good/config';
+import { ComponentConfig, ProviderConfig, ListConfig } from '../../pages/app/components/ir/good/config';
 import { Context } from 'react';
 
 export const contextMap: Record<string, Context<any>> = {};
 
 interface CanvasComponentState {
-  configMap: Record<string, ComponentConfig | ProviderConfig>;
+  configMap: Record<string, ComponentConfig | ProviderConfig | ListConfig>;
   childrenMap: Record<string, string[]>;
   parentMap: Record<string, string>;
 }
@@ -19,46 +19,12 @@ interface UndoRedoState {
 
 export interface CanvasState {
   projectDescription: string | null;
+  demoConfigMap: Record<string, ComponentConfig | ListConfig>
   componentState: UndoRedoState;
   selectedIds: Array<string>;
 }
 
-const defaultConfigMap: Record<string, ComponentConfig | ProviderConfig> = {
-  rowLayout: {
-    type: 'div',
-    attributes: { className: 'flex w-full flex-grow bg-blue-100' },
-    events: [],
-  },
-  colLayout: {
-    type: 'div',
-    attributes: { className: 'flex flex-col w-full h-full flex-grow bg-green-100' },
-    events: [],
-  },
-  label: {
-    type: 'label',
-    attributes:  { className: 'inline', textcontent: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit'},
-    events: [],
-  },
-  button: {
-    type: 'button',
-    attributes:  {className: 'flex w-full', textcontent: 'Button'},
-    events: [],
-  },
-  switch: {
-    type: 'switch',
-    attributes: { className: 'inline-flex items-center' },
-    events: [],
-  },
-  input: {
-    type: 'input',
-    attributes: { className: 'w-full h-8 bg-gray-100', defaultValue: 'Type here...'},
-    events: [],
-  },
-  textArea: {
-    type: 'textarea',
-    attributes: { className: 'w-full h-24 bg-gray-100', defaultValue: 'Type here...'},
-    events: [],
-  },
+const demoConfigMap: Record<string, ComponentConfig> = {
   rowLayout__demo: {
     type: 'div',
     attributes: {className: 'flex w-full', textcontent: 'Row Layout'},
@@ -96,8 +62,47 @@ const defaultConfigMap: Record<string, ComponentConfig | ProviderConfig> = {
   },
 }
 
+const defaultConfigMap: Record<string, ComponentConfig | ProviderConfig | ListConfig> = {
+  rowLayout: {
+    type: 'div',
+    attributes: { className: 'flex w-full flex-grow bg-blue-100' },
+    events: [],
+  },
+  colLayout: {
+    type: 'div',
+    attributes: { className: 'flex flex-col w-full h-full flex-grow bg-green-100' },
+    events: [],
+  },
+  label: {
+    type: 'label',
+    attributes:  { className: 'inline', textcontent: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit'},
+    events: [],
+  },
+  button: {
+    type: 'button',
+    attributes:  {className: 'flex w-full', textcontent: 'Button'},
+    events: [],
+  },
+  switch: {
+    type: 'switch',
+    attributes: { className: 'inline-flex items-center' },
+    events: [],
+  },
+  input: {
+    type: 'input',
+    attributes: { className: 'w-full h-8 bg-gray-100', defaultValue: 'Type here...'},
+    events: [],
+  },
+  textArea: {
+    type: 'textarea',
+    attributes: { className: 'w-full h-24 bg-gray-100', defaultValue: 'Type here...'},
+    events: [],
+  },
+}
+
 const initialState: CanvasState = {
   projectDescription: null,
+  demoConfigMap: demoConfigMap,
   componentState: {
     past: [],
     present: {
@@ -113,10 +118,17 @@ const initialState: CanvasState = {
 const _removeId = (id: string, state: CanvasState) => {
   const componentState = state.componentState.present;
   const parentId = componentState.parentMap[id];
+  // Remove this node from the parent's childrenMap
   if (parentId) {
     componentState.childrenMap[parentId] = componentState.childrenMap[parentId].filter(childId => childId !== id);
-    delete componentState.parentMap[id];
   } 
+  const children = componentState.childrenMap[id];
+  if (children) {
+    children.forEach(childId => _removeId(childId, state));
+  }
+  // Delete the parentMap & childrenMap entries
+  delete componentState.childrenMap[id];
+  delete componentState.parentMap[id];
 }
 
 const _deleteId = (id: string, state: CanvasState) => {
@@ -148,7 +160,7 @@ const _insertId = (id: string, parentId: string, index: number | null, state: Ca
   }
 }
 
-const _addId = (id: string, config: ComponentConfig | ProviderConfig, state: CanvasState) => {
+const _addId = (id: string, config: ComponentConfig | ProviderConfig | ListConfig, state: CanvasState) => {
   state.componentState.present.configMap[id] = config;
 }
 
@@ -201,12 +213,13 @@ const canvasSlice = createSlice({
   name: 'canvas',
   initialState,
   reducers: {
-    add: (state, action: PayloadAction<{ id: string; config: ComponentConfig | ProviderConfig }>) => {
+    add: (state, action: PayloadAction<{ id: string; config: ComponentConfig | ProviderConfig | ListConfig }>) => {
       const { id, config } = action.payload;
       _addId(id, config, state);
     },
     insertChild: (state, action: PayloadAction<{ id: string; parentId: string; index: number | null }>) => {
       const { id, parentId, index } = action.payload;
+      console.log('insert child', id, parentId, index);
       updatePresentState(state, () => _insertId(id, parentId, index, state));
     },
     deleteId: (state, action: PayloadAction<{ id: string }>) => {
@@ -222,6 +235,7 @@ const canvasSlice = createSlice({
     },
     removeId: (state, action: PayloadAction<{ id: string }>) => {
       const { id } = action.payload;
+      console.log('removeId', id);
       updatePresentState(state, () => _removeId(id, state));
     },
     setNewConfigTree: (state, action: PayloadAction<{ configTree: any }>) => {

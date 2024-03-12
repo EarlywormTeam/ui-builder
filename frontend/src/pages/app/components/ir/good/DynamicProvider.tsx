@@ -2,7 +2,7 @@ import { useReducer, PropsWithChildren } from 'react';
 import { ProviderConfig } from './config';
 import { useDynamicContexts } from 'src/redux/selector';
 
-export function DynamicProvider({id, config, children}: PropsWithChildren<{id: string, config: ProviderConfig}>) {
+export function DynamicProvider({id, config, listIndex, children}: PropsWithChildren<{id: string, config: ProviderConfig, listIndex: string | undefined}>) {
   const [state, dispatch] = useReducer(createReducer(config.actions), config.initialState);
   const Context = useDynamicContexts([id])[0];
   return <Context.Provider value={{state, dispatch}}>{children}</Context.Provider>
@@ -11,6 +11,8 @@ export function DynamicProvider({id, config, children}: PropsWithChildren<{id: s
 // Dynamically create reducer from JSON
 const createReducer = (actions: Array<{name: string, reducerCode: string}>) => {
   return (state: any, action: any) => {
+    console.log('state', state);
+    console.log('action', action);
     const matchedAction = actions.find(a => a.name === action.type);
     if (!matchedAction) return state;
     

@@ -10,6 +10,7 @@ const ComponentMenu = () => {
           <DynamicElement
             id={component + "__demo"}
             key={component + "__demo"}
+            listIndex={undefined}
             draggable={dragEnabled}
             droppable={dropEnabled}
           />
