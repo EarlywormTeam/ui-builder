@@ -21,10 +21,47 @@ export interface CanvasState {
   projectDescription: string | null;
   demoConfigMap: Record<string, ComponentConfig | ListConfig>
   componentState: UndoRedoState;
-  selectedIds: Array<string>;
+  selectedIds: Record<string, boolean>;
+  textEditingId: string | null;
+  lastClickTime: Record<string, number>;
 }
 
 const demoConfigMap: Record<string, ComponentConfig> = {
+  rowLayout: {
+    type: 'div',
+    attributes: { className: 'flex w-full flex-grow bg-blue-100' },
+    events: [],
+  },
+  colLayout: {
+    type: 'div',
+    attributes: { className: 'flex flex-col w-full h-full flex-grow bg-green-100' },
+    events: [],
+  },
+  label: {
+    type: 'label',
+    attributes:  { className: 'inline', textcontent: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit'},
+    events: [],
+  },
+  button: {
+    type: 'button',
+    attributes:  {className: 'flex w-full', textcontent: 'Button'},
+    events: [],
+  },
+  switch: {
+    type: 'switch',
+    attributes: { className: 'inline-flex items-center' },
+    events: [],
+  },
+  input: {
+    type: 'input',
+    attributes: { className: 'w-full h-8 bg-gray-100', defaultValue: 'Type here...'},
+    events: [],
+  },
+  textArea: {
+    type: 'textarea',
+    attributes: { className: 'w-full h-24 bg-gray-100', defaultValue: 'Type here...'},
+    events: [],
+  },
   rowLayout__demo: {
     type: 'div',
     attributes: {className: 'flex w-full', textcontent: 'Row Layout'},
@@ -62,43 +99,7 @@ const demoConfigMap: Record<string, ComponentConfig> = {
   },
 }
 
-const defaultConfigMap: Record<string, ComponentConfig | ProviderConfig | ListConfig> = {
-  rowLayout: {
-    type: 'div',
-    attributes: { className: 'flex w-full flex-grow bg-blue-100' },
-    events: [],
-  },
-  colLayout: {
-    type: 'div',
-    attributes: { className: 'flex flex-col w-full h-full flex-grow bg-green-100' },
-    events: [],
-  },
-  label: {
-    type: 'label',
-    attributes:  { className: 'inline', textcontent: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit'},
-    events: [],
-  },
-  button: {
-    type: 'button',
-    attributes:  {className: 'flex w-full', textcontent: 'Button'},
-    events: [],
-  },
-  switch: {
-    type: 'switch',
-    attributes: { className: 'inline-flex items-center' },
-    events: [],
-  },
-  input: {
-    type: 'input',
-    attributes: { className: 'w-full h-8 bg-gray-100', defaultValue: 'Type here...'},
-    events: [],
-  },
-  textArea: {
-    type: 'textarea',
-    attributes: { className: 'w-full h-24 bg-gray-100', defaultValue: 'Type here...'},
-    events: [],
-  },
-}
+const defaultConfigMap: Record<string, ComponentConfig | ProviderConfig | ListConfig> = {}
 
 const initialState: CanvasState = {
   projectDescription: null,
@@ -112,7 +113,9 @@ const initialState: CanvasState = {
     },
     future: [],
   },
-  selectedIds: [] as Array<string>,
+  selectedIds: {},
+  textEditingId: null,
+  lastClickTime: {},  
 };
 
 const _removeId = (id: string, state: CanvasState) => {
@@ -129,6 +132,8 @@ const _removeId = (id: string, state: CanvasState) => {
   // Delete the parentMap & childrenMap entries
   delete componentState.childrenMap[id];
   delete componentState.parentMap[id];
+  delete state.selectedIds[id];
+  delete state.lastClickTime[id];
 }
 
 const _deleteId = (id: string, state: CanvasState) => {
@@ -139,7 +144,8 @@ const _deleteId = (id: string, state: CanvasState) => {
   _removeId(id, state);
   delete componentState.configMap[id];
   delete contextMap[id];
-  state.selectedIds = state.selectedIds.filter((sid: string) => sid !== id);
+  delete state.selectedIds[id];
+  delete state.lastClickTime[id];
 }
 
 const _insertId = (id: string, parentId: string, index: number | null, state: CanvasState) => {
@@ -158,6 +164,8 @@ const _insertId = (id: string, parentId: string, index: number | null, state: Ca
     const context = createContext({state: config.initialState, dispatch: () => {}})
     contextMap[id] = context;
   }
+  state.selectedIds[id] = false;
+  state.lastClickTime[id] = 0;
 }
 
 const _addId = (id: string, config: ComponentConfig | ProviderConfig | ListConfig, state: CanvasState) => {
@@ -227,8 +235,10 @@ const canvasSlice = createSlice({
     },
     deleteSelected: (state) => {
       updatePresentState(state, () => {
-        state.selectedIds.forEach(id => {
-          _deleteId(id, state);
+        Object.entries(state.selectedIds).forEach(([key, value]) => {
+          if (value === true) {
+            _deleteId(key, state);
+           }
         });
       });
     },
@@ -244,14 +254,26 @@ const canvasSlice = createSlice({
       const { projectDescription } = action.payload;
       state.projectDescription = projectDescription;
     },
+    setSelectedStateForIds: (state, action: PayloadAction<Record<string, boolean>>) => {
+      Object.entries(action.payload).forEach(([id, isSelected]) => {
+        state.selectedIds[id] = isSelected;
+      });
+    },
     setSelectedIds: (state, action: PayloadAction<Array<string>>) => {
-      state.selectedIds = action.payload;
+      Object.keys(state.selectedIds).forEach(id => state.selectedIds[id] = action.payload.includes(id));
     },
     addSelectedId: (state, action: PayloadAction<string>) => {
-      state.selectedIds.push(action.payload);
+      state.selectedIds[action.payload] = true;
     },
     removeSelectedId: (state, action: PayloadAction<string>) => {
-      state.selectedIds = state.selectedIds.filter(id => id !== action.payload);
+      state.selectedIds[action.payload] = false;
+    },
+    setLastClickTime: (state, action: PayloadAction<{ id: string, time: number }>) => {
+      const { id, time } = action.payload;
+      state.lastClickTime[id] = time;
+    },
+    setTextEditingId: (state, action: PayloadAction<string | null>) => {
+      state.textEditingId = action.payload;
     },
     undo: (state) => {
       const savedState = state.componentState.past.pop();
@@ -270,6 +292,6 @@ const canvasSlice = createSlice({
   },
 });
 
-export const { add, insertChild, removeId, setNewConfigTree, genStarterTemplate, setSelectedIds, deleteSelected, deleteId, addSelectedId, removeSelectedId, undo, redo } = canvasSlice.actions;
+export const { add, insertChild, removeId, setNewConfigTree, genStarterTemplate, setSelectedIds, deleteSelected, deleteId, addSelectedId, removeSelectedId, setLastClickTime, setTextEditingId, undo, redo } = canvasSlice.actions;
 
 export default canvasSlice.reducer;

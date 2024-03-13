@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogTrigger, DialogClose } from '../../../components/ui/dialog';
+import { useState, useEffect, useRef } from 'react';
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogTrigger } from '../../../components/ui/dialog';
 import { Textarea } from '../../../components/ui/textarea';
 import { Label } from '../../../components/ui/label';
 import { Button } from '../../../components/ui/button';
@@ -8,13 +8,19 @@ import { genStarterTemplate } from '../../../redux/slice/canvasSlice';
 
 const ProjectStartModal = () => {
   const [isModalOpen, setIsModalOpen] = useState(true);
+  const presentedRef = useRef(false);
   const [projectDescription, setProjectDescription] = useState('');
   const dispatch = useDispatch();
 
   useEffect(() => {
     // Automatically open the modal when the app starts
-    setIsModalOpen(true);
-  }, []);
+    setIsModalOpen(!presentedRef.current);
+  }, [presentedRef]);
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    presentedRef.current = false;
+  }
 
   return (
     <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
@@ -34,13 +40,13 @@ const ProjectStartModal = () => {
           onChange={(e) => setProjectDescription(e.target.value)}
         />
         <div className="flex justify-end space-x-2 mt-4">
-          <Button variant="outline" onClick={() => setIsModalOpen(false)}>Freestyle</Button>
+          <Button variant="outline" onClick={() => closeModal()}>Freestyle</Button>
           <Button 
             variant="default" 
             disabled={!projectDescription.trim()} 
             onClick={() => {
               // Logic to handle "Start" action
-              setIsModalOpen(false);
+              closeModal();
               dispatch(genStarterTemplate({ projectDescription: projectDescription.trim() }));
             }}
           >

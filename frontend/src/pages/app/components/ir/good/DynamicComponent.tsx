@@ -6,12 +6,12 @@ import { useComponent } from './useComponent';
 import withDraggable from "../../DraggableComponent";
 import withDroppable from "../../DroppableComponent";
 import { DynamicElement } from "./DynamicElement";
-import { add, addSelectedId, setSelectedIds } from 'src/redux/slice/canvasSlice';
+import { add, addSelectedId, setSelectedIds, setTextEditingId, setLastClickTime } from 'src/redux/slice/canvasSlice';
 import { RootState } from "src/redux/store";
 
-const useIsSelected = (id: string) => {
-  const selectedIds = useSelector((state: RootState) => state.canvas.selectedIds);
-  return selectedIds.includes(id);
+const useIsTextEditing = (id: string) => {
+  const textEditingId = useSelector((state: RootState) => state.canvas.textEditingId);
+  return textEditingId === id;
 }
 
 const extractContextIdsFromEvents = (events: { actions: { contextId: string, actionPayload: { args: Array<{ contextId: string }>} | string | null }[] }[]) => {
@@ -116,35 +116,31 @@ const convertEventHandlers = (
 export const DynamicComponent: React.FC<PropsWithChildren<{id: string, listIndex: string | undefined, config: ComponentConfig, childrenIds: string[], draggable: boolean, droppable: boolean, mode?: 'preview' | 'editing'} & React.HTMLAttributes<HTMLElement>>> = ({id, listIndex, config, childrenIds, draggable, droppable, children, mode, ...props}) => {
   const displayMode = mode || 'preview';
   const dispatch = useDispatch();
-  const [isEditing, setIsEditing] = useState(false);
+  const isTextEditing = useIsTextEditing(id);
   const [editContent, setEditContent] = useState(config.attributes.textcontent) || '';
-  const isSelected = useIsSelected(id);
-  const [localIsSelected, setLocalIsSelected] = useState(isSelected); // Local state for immediate UI feedback
-
-  useEffect(() => {
-    setLocalIsSelected(isSelected);
-  }, [isSelected]);
+  const isSelected = useSelector((state: RootState) => state.canvas.selectedIds[id]);
+  const lastClickTime = useSelector((state: RootState) => state.canvas.lastClickTime[id]);
 
   useEffect(() => {
     if (displayMode === 'editing') {
       const handleClickOutside = (ev: MouseEvent) => {
         const isClickInsideTextInput = ev.target instanceof HTMLInputElement && ev.target.classList.contains('editable-text-input');
         if (!isClickInsideTextInput) {
-          setIsEditing(false);
+          dispatch(setTextEditingId(null));
         }
       }
-      if (isEditing) {
+      if (isTextEditing) {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
       }
     }
-  }, [isEditing, displayMode]);
+  }, [isTextEditing, displayMode, dispatch]);
 
   useEffect(() => {
-    if (displayMode === 'editing' && !isEditing && config.attributes.textcontent !== editContent) {
+    if (displayMode === 'editing' && !isTextEditing && config.attributes.textcontent !== editContent) {
       dispatch(add({ id, config: { ...config, attributes: { ...config.attributes, textcontent: editContent } } }));
     }
-  }, [displayMode, isEditing, editContent, config, id, dispatch]);
+  }, [displayMode, isTextEditing, editContent, config, id, dispatch]);
 
   const toggleIsSelected = (isSelected: boolean) => {
     if (lastClickEventRef.current && (lastClickEventRef.current.metaKey || lastClickEventRef.current.ctrlKey)) { // Check if Cmd (metaKey) or Ctrl (ctrlKey) is pressed
@@ -154,21 +150,13 @@ export const DynamicComponent: React.FC<PropsWithChildren<{id: string, listIndex
     }
   };
 
-  // useEffect(() => {
-  //   if (!isEditing && localIsSelected !== isSelected) {
-  //     toggleIsSelected();
-  //   }
-  // }, [localIsSelected, isEditing, isSelected, toggleIsSelected])
-
   const handleDoubleClick: React.MouseEventHandler<HTMLElement> = (event) => {
-    setIsEditing(current => !current);
+    dispatch(setTextEditingId(id));
     event.stopPropagation();
   }
 
   const clickDownTimeRef = useRef<number | null>(null);
-  const lastClickTimeRef = useRef<number | null>(null);
   const lastClickEventRef = useRef<React.MouseEvent<HTMLElement> | React.TouchEvent<HTMLElement> | null>(null);
-  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleMouseDown = (event: React.MouseEvent<HTMLElement> | React.TouchEvent<HTMLElement>) => {
     event.stopPropagation();
@@ -182,34 +170,24 @@ export const DynamicComponent: React.FC<PropsWithChildren<{id: string, listIndex
     if (
         clickDownTimeRef.current && 
         (Date.now() - clickDownTimeRef.current) < 100 && // make sure this isn't a drag
-        (Date.now() - (lastClickTimeRef.current || 0)) > 200 // don't interfere with a double click
+        (Date.now() - (lastClickTime || 0)) > 200 // don't interfere with a double click
       ) {
-      console.log('single click', Date.now() - (lastClickTimeRef.current || 0));
+      console.log('single click', Date.now() - (lastClickTime || 0));
 
-      if (clickTimeoutRef.current) {
-        clearTimeout(clickTimeoutRef.current);
-      }
-
-      clickTimeoutRef.current = setTimeout(() => {
-        toggleIsSelected(!localIsSelected);
-        clickTimeoutRef.current = null;
-      }, 205);
-
-      setLocalIsSelected(true) // Cast event type if necessary
-      
+        toggleIsSelected(true);
 
        // Adjust the timeout duration if needed, ensuring it's slightly longer than the double click detection window
-    } else if (lastClickTimeRef.current && (Date.now() - lastClickTimeRef.current) < 200) {
-      console.log('double click')
+    } else if (lastClickTime && (Date.now() - lastClickTime) < 200) {
+      console.log('double click', Date.now() - lastClickTime)
       // If the time difference between the last click and this one is less than 250ms, consider it a double click
       handleDoubleClick(event as React.MouseEvent<HTMLElement>); // Cast event type if necessary
     }
 
-    lastClickTimeRef.current = Date.now();
+    dispatch(setLastClickTime({id: id, time: Date.now()}));
   };
   
-  const onMouseDown = (isEditing || displayMode === 'preview') ? undefined : handleMouseDown;
-  const onMouseUp = (isEditing || displayMode === 'preview') ? undefined : handleMouseUp;
+  const onMouseDown = (isTextEditing || displayMode === 'preview') ? undefined : handleMouseDown;
+  const onMouseUp = (isTextEditing || displayMode === 'preview') ? undefined : handleMouseUp;
 
   const eventContextIds = extractContextIdsFromEvents(config.events);
   const attributeContextIds = extractContextIdsFromAttributes(config.attributes);
@@ -246,7 +224,11 @@ export const DynamicComponent: React.FC<PropsWithChildren<{id: string, listIndex
 
         const atts = {
           ...attributes,
-          className: localIsSelected ? `${attributes.className || ''} shadow-xl outline outline-2 outline-offset-2 outline-blue-500 transform scale-103` : attributes.className
+          className: isSelected ? `${attributes.className || ''} shadow-xl outline outline-2 outline-offset-2 outline-blue-500 transform scale-103` : attributes.className
+        }
+
+        const setEditingHandler = (editing: boolean) => { 
+          dispatch(setTextEditingId(editing ? id : null));
         }
 
         return (
@@ -255,11 +237,11 @@ export const DynamicComponent: React.FC<PropsWithChildren<{id: string, listIndex
               listIndex={listIndex}
               hasChildren={childrenIds.length > 0}
               childrenIds={childrenIds}
-              isEditing={isEditing}
+              isEditing={isTextEditing}
               editContent={typeof editContent !== 'object' ? editContent : executeFunctionConfig({listIndex: isNaN(Number(listIndex)) ? undefined : Number(listIndex)}, contexts, editContent)}
               content={attributes.textcontent || ''}
               setEditContent={setEditContent}
-              setIsEditing={setIsEditing}
+              setIsEditing={setEditingHandler}
               draggable={draggable}
               droppable={droppable}
               displayMode={displayMode}
