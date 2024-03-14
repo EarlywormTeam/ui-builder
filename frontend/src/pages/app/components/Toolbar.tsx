@@ -3,7 +3,7 @@ import { RootState } from 'src/redux/store';
 import { Button } from 'src/components/ui/button';
 import { Label } from 'src/components/ui/label';
 import { Switch } from 'src/components/ui/switch';
-import { undo, redo } from 'src/redux/slice/canvasSlice';
+import { undo, redo, downloadCode } from 'src/redux/slice/canvasSlice';
 import { startMagicPaint, startMagicWiring } from 'src/redux/slice/loadingSlice';
 
 
@@ -63,6 +63,9 @@ const Toolbar: React.FC<ToolbarProps> = ({isPreview, setIsPreview}) => {
         </Button>
         <Button variant={'default'} disabled={!canRedo} onClick={(e) => dispatch(redo())}>
           <img src={process.env.PUBLIC_URL + "/redo.svg"} alt="Redo" style={{width: '100%', height: '100%', objectFit: 'contain'}}/>
+        </Button>
+        <Button variant={'outline'} onClick={(e) => dispatch(downloadCode())}>
+          <img src={process.env.PUBLIC_URL + "/download.svg"} alt="Download Code" style={{width: '100%', height: '100%', objectFit: 'contain'}}/>
         </Button>
       </div>
     </div>

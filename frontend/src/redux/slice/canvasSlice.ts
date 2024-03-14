@@ -1,11 +1,11 @@
-import { createContext } from 'react';
+import { createContext, Context } from 'react';
 import { PayloadAction, createSlice } from '@reduxjs/toolkit';
 import { ComponentConfig, ProviderConfig, ListConfig } from '../../pages/app/components/ir/good/config';
-import { Context } from 'react';
+import generateCode from './generateCode';
 
 export const contextMap: Record<string, Context<any>> = {};
 
-interface CanvasComponentState {
+export interface CanvasComponentState {
   configMap: Record<string, ComponentConfig | ProviderConfig | ListConfig>;
   childrenMap: Record<string, string[]>;
   parentMap: Record<string, string>;
@@ -314,10 +314,14 @@ const canvasSlice = createSlice({
         state.componentState.past.push(state.componentState.present);
         state.componentState.present = futureState;
       }
+    },
+    downloadCode: (state) => {
+      const code = generateCode(state.componentState.present);
+      console.log(code);
     }
   },
 });
 
-export const { add, addConfigClassName, removeConfigClassName, insertChild, removeId, setNewConfigTree, genStarterTemplate, setSelectedIds, deleteSelected, deleteId, addSelectedId, removeSelectedId, setLastClickTime, setTextEditingId, undo, redo } = canvasSlice.actions;
+export const { add, addConfigClassName, removeConfigClassName, insertChild, removeId, setNewConfigTree, genStarterTemplate, setSelectedIds, deleteSelected, deleteId, addSelectedId, removeSelectedId, setLastClickTime, setTextEditingId, undo, redo, downloadCode } = canvasSlice.actions;
 
 export default canvasSlice.reducer;

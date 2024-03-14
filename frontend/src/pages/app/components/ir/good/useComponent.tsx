@@ -21,3 +21,15 @@ export function useComponent(type: string) {
   return Comp;
 }
 
+const componentNameMap: Record<string, string> = {
+  div: 'div',
+  label: 'Label',
+  button: 'Button',
+  switch: 'Switch',
+  textarea: 'Textarea',
+  input: 'Input',
+}
+
+export function getComponentName(type: string) {
+  return componentNameMap[type];
+}
