@@ -7,6 +7,8 @@ import Canvas from './components/Canvas'; // Your canvas component
 import ComponentMap from './components/ComponentMap';
 import Toolbar from './components/Toolbar';
 import { setSelectedIds } from 'src/redux/slice/canvasSlice';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from 'src/components/ui/resizable';
+import PropertyEditor from './components/PropertyEditor';
 
 const useIsTextEditing = () => {
   const textEditingId = useSelector((state: RootState) => state.canvas.textEditingId);
@@ -40,17 +42,27 @@ const AppInternal = ({isPreview, setIsPreview}: {isPreview: boolean, setIsPrevie
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
       <Toolbar isPreview={isPreview} setIsPreview={setIsPreview} />
-      <div className="flex h-full w-full overflow-hidden">
-        <div className="flex h-full w-1/4">
+      <ResizablePanelGroup direction='horizontal' className='flex h-full w-full overflow-hidden'>
+        <ResizablePanel className="flex h-full w-full" minSize={10} maxSize={15} defaultSize={15} collapsible={true} collapsedSize={2}>
           <ComponentMap />
-        </div>
-        <div className="flex h-full w-full">
+        </ResizablePanel>
+        <ResizableHandle/>
+        <ResizablePanel className="flex h-full w-full" minSize={25} maxSize={100} defaultSize={65}>
           <Canvas isPreview={isPreview} />
-        </div>
-        <div className="flex h-full w-1/4 gap-4">
-          <ComponentMenu />
-        </div>
-      </div>
+        </ResizablePanel>
+        <ResizableHandle/>
+        <ResizablePanel className="flex h-full w-full gap-4" minSize={10} maxSize={35} defaultSize={20} collapsible={true} collapsedSize={2}>
+          <ResizablePanelGroup direction='vertical' className='flex h-full w-full overflow-hidden'>
+            <ResizablePanel className="flex h-full w-full overflow-y-auto" minSize={15} maxSize={98} defaultSize={70} collapsedSize={2} collapsible={true}>
+              <ComponentMenu />
+            </ResizablePanel>
+            <ResizableHandle/>
+            <ResizablePanel className="flex h-full w-full" minSize={15} maxSize={98} defaultSize={30} collapsedSize={2} collapsible={true}>
+              <PropertyEditor />
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </ResizablePanel>
+        </ResizablePanelGroup>
     </div>
   )
 }

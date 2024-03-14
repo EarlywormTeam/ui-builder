@@ -225,6 +225,32 @@ const canvasSlice = createSlice({
       const { id, config } = action.payload;
       _addId(id, config, state);
     },
+    addConfigClassName: (state, action: PayloadAction<{ id: string; className: string }>) => {
+      const { id, className } = action.payload;
+      updatePresentState(state, () => {
+        const config = state.componentState.present.configMap[id];
+        if (config && 'attributes' in config) {
+          if (typeof config.attributes.className === 'string') {
+            config.attributes.className = className + ' ' + config.attributes.className;
+          } else {
+            console.error('className is bound, updating is not supported yet.');
+          }
+        }
+      });
+    },
+    removeConfigClassName: (state, action: PayloadAction<{ id: string, className: string }>) => {
+      const { id, className } = action.payload;
+      updatePresentState(state, () => {
+        const config = state.componentState.present.configMap[id];
+        if (config && 'attributes' in config) {
+          if (typeof config.attributes.className === 'string') {
+            config.attributes.className = config.attributes.className.replace(className, '');
+          } else {
+            console.error('className is bound, updating is not supported yet.');
+          }
+        }
+      })
+    },
     insertChild: (state, action: PayloadAction<{ id: string; parentId: string; index: number | null }>) => {
       const { id, parentId, index } = action.payload;
       updatePresentState(state, () => _insertId(id, parentId, index, state));
@@ -292,6 +318,6 @@ const canvasSlice = createSlice({
   },
 });
 
-export const { add, insertChild, removeId, setNewConfigTree, genStarterTemplate, setSelectedIds, deleteSelected, deleteId, addSelectedId, removeSelectedId, setLastClickTime, setTextEditingId, undo, redo } = canvasSlice.actions;
+export const { add, addConfigClassName, removeConfigClassName, insertChild, removeId, setNewConfigTree, genStarterTemplate, setSelectedIds, deleteSelected, deleteId, addSelectedId, removeSelectedId, setLastClickTime, setTextEditingId, undo, redo } = canvasSlice.actions;
 
 export default canvasSlice.reducer;

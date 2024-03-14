@@ -2,7 +2,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { contextMap } from '../slice/canvasSlice';
 
-export const getCanvasState = (state: RootState) => state.canvas;
+export const getCanvasState = (state: RootState) => state.canvas.componentState.present;
 
 export const useDynamicContexts = (ids: string[]) => {
   const Contexts = ids.map(id => contextMap[id]).filter(c => c !== undefined);

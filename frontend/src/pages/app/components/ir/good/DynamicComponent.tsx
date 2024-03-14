@@ -126,6 +126,9 @@ export const DynamicComponent: React.FC<PropsWithChildren<{id: string, listIndex
       const handleClickOutside = (ev: MouseEvent) => {
         const isClickInsideTextInput = ev.target instanceof HTMLInputElement && ev.target.classList.contains('editable-text-input');
         if (!isClickInsideTextInput) {
+          if (config.attributes.textcontent !== editContent) {
+            dispatch(add({ id, config: { ...config, attributes: { ...config.attributes, textcontent: editContent } } }));
+          }
           dispatch(setTextEditingId(null));
         }
       }
@@ -134,13 +137,7 @@ export const DynamicComponent: React.FC<PropsWithChildren<{id: string, listIndex
         return () => document.removeEventListener('mousedown', handleClickOutside);
       }
     }
-  }, [isTextEditing, displayMode, dispatch]);
-
-  useEffect(() => {
-    if (displayMode === 'editing' && !isTextEditing && config.attributes.textcontent !== editContent) {
-      dispatch(add({ id, config: { ...config, attributes: { ...config.attributes, textcontent: editContent } } }));
-    }
-  }, [displayMode, isTextEditing, editContent, config, id, dispatch]);
+  }, [isTextEditing, editContent, config, displayMode, dispatch, id]);
 
   const toggleIsSelected = (isSelected: boolean) => {
     if (lastClickEventRef.current && (lastClickEventRef.current.metaKey || lastClickEventRef.current.ctrlKey)) { // Check if Cmd (metaKey) or Ctrl (ctrlKey) is pressed
@@ -191,7 +188,7 @@ export const DynamicComponent: React.FC<PropsWithChildren<{id: string, listIndex
 
   const eventContextIds = extractContextIdsFromEvents(config.events);
   const attributeContextIds = extractContextIdsFromAttributes(config.attributes);
-  const contextIds = [...new Set([...eventContextIds, ...attributeContextIds])];
+  const contextIds = [...new Set([...eventContextIds, ...attributeContextIds].filter(id => id !== undefined))];
 
   const Component = useComponent(config.type);
   if (!Component) {
@@ -227,7 +224,10 @@ export const DynamicComponent: React.FC<PropsWithChildren<{id: string, listIndex
           className: isSelected ? `${attributes.className || ''} shadow-xl outline outline-2 outline-offset-2 outline-blue-500 transform scale-103` : attributes.className
         }
 
-        const setEditingHandler = (editing: boolean) => { 
+        const setEditingHandler = (editing: boolean) => {
+          if (editContent !== attributes.textcontent) {
+            dispatch(add({ id, config: { ...config, attributes: { ...config.attributes, textcontent: editContent } } }));
+          }
           dispatch(setTextEditingId(editing ? id : null));
         }
 
@@ -306,7 +306,9 @@ const Filler: React.FC<FillerProps> = ({ listIndex, hasChildren, childrenIds, is
         className="bg-white text-black border-1 border-gray-300 editable-text-input"
         value={editContent}
         onClick={(ev: React.MouseEvent<HTMLInputElement>) => ev.stopPropagation()}
-        onChange={(ev: React.ChangeEvent<HTMLInputElement>) => setEditContent(ev.target.value)}
+        onChange={(ev: React.ChangeEvent<HTMLInputElement>) => { 
+          setEditContent(ev.target.value)}
+        }
         onKeyDown={(ev: React.KeyboardEvent<HTMLInputElement>) => ev.key === 'Enter' && setIsEditing(false)}
         onBlur={() => setIsEditing(false)}
         autoFocus
