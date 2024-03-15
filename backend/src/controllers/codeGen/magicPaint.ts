@@ -5,7 +5,7 @@ import { ConfigTree} from '../../types/config';
 export const doMagicPaint = async (ctx: Context) => {
   const { configTree } = ctx.request.body as {configTree: ConfigTree};
   const messages: LLM.LlmMessage[] = [{role: "system", content: magicPaintSystemPrompt}, {role: "user", content: JSON.stringify(magicPaintExampleOne)}, {role: "assistant", content: JSON.stringify(magicPaintSolutionOne)}, {role: "user", content: JSON.stringify(configTree)}];
-  const resMessage = await LLM.queryLlmWithJsonValidation(messages, (json) => true, 'gpt-3.5-turbo-0125', 0.2);
+  const resMessage = await LLM.queryLlmWithJsonValidation('claude', messages, (json) => true, 'claude-3-haiku-20240307', 1);
   console.log(JSON.stringify(JSON.parse(resMessage.content), null, 2));
   ctx.body = {configTree: JSON.parse(resMessage.content)};
 }

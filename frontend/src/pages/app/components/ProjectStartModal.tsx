@@ -1,32 +1,26 @@
-import { useState, useEffect, useRef } from 'react';
-import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogTrigger } from '../../../components/ui/dialog';
+import { useState, useRef } from 'react';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../../../components/ui/dialog';
 import { Textarea } from '../../../components/ui/textarea';
 import { Label } from '../../../components/ui/label';
 import { Button } from '../../../components/ui/button';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { genStarterTemplate } from '../../../redux/slice/canvasSlice';
+import { RootState } from 'src/redux/store';
 
 const ProjectStartModal = () => {
-  const [isModalOpen, setIsModalOpen] = useState(true);
-  const presentedRef = useRef(false);
-  const [projectDescription, setProjectDescription] = useState('');
+  const projectDescription = useSelector((state: RootState) => state.canvas.projectDescription);
+  const presentedRef = useRef(projectDescription !== null);
+  const [localProjectDescription, setLocalProjectDescription] = useState('');
   const dispatch = useDispatch();
 
-  useEffect(() => {
-    // Automatically open the modal when the app starts
-    setIsModalOpen(!presentedRef.current);
-  }, [presentedRef]);
-
   const closeModal = () => {
-    setIsModalOpen(false);
-    presentedRef.current = false;
+    dispatch(genStarterTemplate({projectDescription: localProjectDescription}))
+    // setIsModalOpen(false);
+    presentedRef.current = true;
   }
 
   return (
-    <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-      <DialogTrigger asChild>
-        <Button className="hidden">Open</Button>
-      </DialogTrigger>
+    <Dialog defaultOpen={!presentedRef.current} open={!presentedRef.current} onOpenChange={() => closeModal()}>
       <DialogContent>
         <DialogTitle>What do you want to build?</DialogTitle>
         <DialogDescription>
@@ -36,19 +30,15 @@ const ProjectStartModal = () => {
         <Textarea
           id="project-description"
           placeholder="Describe your project here..."
-          value={projectDescription}
-          onChange={(e) => setProjectDescription(e.target.value)}
+          value={localProjectDescription}
+          onChange={(e) => setLocalProjectDescription(e.target.value)}
         />
         <div className="flex justify-end space-x-2 mt-4">
           <Button variant="outline" onClick={() => closeModal()}>Freestyle</Button>
           <Button 
             variant="default" 
-            disabled={!projectDescription.trim()} 
-            onClick={() => {
-              // Logic to handle "Start" action
-              closeModal();
-              dispatch(genStarterTemplate({ projectDescription: projectDescription.trim() }));
-            }}
+            disabled={!localProjectDescription.trim()} 
+            onClick={() => closeModal()}
           >
             Start
           </Button>

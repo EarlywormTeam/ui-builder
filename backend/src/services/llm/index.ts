@@ -1,10 +1,6 @@
-import { OpenAI } from 'openai';
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-export interface LlmMessage {
-  role: 'system' | 'assistant' | 'user';
-  content: string;
-}
+import * as Claude from './claude';
+import * as OpenAI from './openai';
+import { LlmMessage } from './types';
 
 /**
  * @param messages - The messages to send to LLM, must be an array of {role, content} objects.
@@ -12,18 +8,15 @@ export interface LlmMessage {
  * @returns A promise that resolves to a message object.
  * @throws If the LLM errors out.
  */
-async function queryLlm(messages: LlmMessage[], temperature: number = 0): Promise<LlmMessage> {
-  console.log('queryLlm:', JSON.stringify(messages));
-  const res: OpenAI.ChatCompletion = await openai.chat.completions.create({
-    model: 'gpt-4-0125-preview',
-    messages: messages.map(msg => ({role: msg.role, content: msg.content})),
-    temperature: temperature,
-    top_p: 1,
-    max_tokens: 4096,
-  });
-  const message: LlmMessage = { role: res.choices[0].message.role, content: res.choices[0].message.content || '' };
-  console.log('response:', JSON.stringify(message));
-  return message;
+async function queryLlm(provider: 'openai' | 'claude', messages: LlmMessage[], temperature: number = 0): Promise<LlmMessage> {
+  switch (provider) {
+    case 'openai':
+      return OpenAI.queryLlm(messages, temperature);
+    case 'claude':
+      return Claude.queryLlm(messages, temperature);
+    default:
+      throw new Error(`Invalid provider: ${provider}`);
+  }
 }
 
 class JsonValidationError extends Error {
@@ -46,42 +39,23 @@ class JsonValidationError extends Error {
  * @throws If the LLM errors out or if the json response is invalid.
  */
 async function queryLlmWithJsonValidation(
+  provider: 'openai' | 'claude',
   messages: LlmMessage[], 
   jsonValidator: (json: any) => boolean, 
-  model: 'gpt-4-0125-preview' | 'gpt-3.5-turbo-0125', 
+  model: 'claude-3-opus-20240229' | 'claude-3-sonnet-20240229' | 'claude-3-haiku-20240307' | 'gpt-4-0125-preview' | 'gpt-3.5-turbo-0125', 
   temperature: number = 0, 
   customError: JsonValidationError | null = null): Promise<LlmMessage> {
-    if (customError && customError.messages) {
-      messages = messages.concat(customError.messages);
-    }
-    console.log('queryLlmWithJsonValidation:', JSON.stringify(messages));
-    const res: OpenAI.ChatCompletion = await openai.chat.completions.create({
-      // model: 'gpt-4-0125-preview',
-      model: model,
-      messages: messages.map(msg => ({role: msg.role, content: msg.content})),
-      temperature: temperature,
-      top_p: 1,
-      max_tokens: 4096,
-      response_format: {type: 'json_object'},
-    });
-    const message: LlmMessage = { role: res.choices[0].message.role, content: res.choices[0].message.content || '' };
-    console.log('response:', JSON.stringify(message));
-    try {
-      const json = JSON.parse(message.content);
-      if (jsonValidator(json)) {
-        return message;
-      } else {
-        throw new JsonValidationError('Invalid JSON response', [message]);
-      }
-    } catch (error) {
-      if (error instanceof Error) {
-        const augmentedError = new JsonValidationError(`Error: ${error.message}`, [message, {role: 'user', content: `Error: ${error.message}`}]);
-        console.error(augmentedError);
-        throw augmentedError;
-      } else {
-        throw new JsonValidationError('An unknown error occurred', []);
-      }
-    }
+  switch (provider) {
+    case 'openai':
+      const openAIModel = model as 'gpt-4-0125-preview' | 'gpt-3.5-turbo-0125';
+      return OpenAI.queryLlmWithJsonValidation(messages, jsonValidator, openAIModel, temperature, customError);
+    case 'claude':
+      const claudeModel = model as 'claude-3-opus-20240229' | 'claude-3-sonnet-20240229' | 'claude-3-haiku-20240307';
+      return Claude.queryLlmWithJsonValidation(messages, jsonValidator, claudeModel, temperature, customError);
+    default:
+      throw new Error(`Invalid provider: ${provider}`);
+  }
 }
 
-export { queryLlm, queryLlmWithJsonValidation };
+export { LlmMessage, queryLlm, queryLlmWithJsonValidation };
+

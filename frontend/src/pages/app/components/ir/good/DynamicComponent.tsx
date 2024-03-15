@@ -8,6 +8,7 @@ import withDroppable from "../../DroppableComponent";
 import { DynamicElement } from "./DynamicElement";
 import { add, addSelectedId, setSelectedIds, setTextEditingId, setLastClickTime } from 'src/redux/slice/canvasSlice';
 import { RootState } from "src/redux/store";
+import { useDragAndDropContext } from "../../DragAndDropContext";
 
 const useIsTextEditing = (id: string) => {
   const textEditingId = useSelector((state: RootState) => state.canvas.textEditingId);
@@ -113,9 +114,15 @@ const convertEventHandlers = (
   return convertedHandlers;
 };
 
+const useIsDragOver = (id: string): boolean => {
+  const dndContext = useDragAndDropContext();
+  return dndContext.overComponentId === id;
+}
+
 export const DynamicComponent: React.FC<PropsWithChildren<{id: string, listIndex: string | undefined, config: ComponentConfig, childrenIds: string[], draggable: boolean, droppable: boolean, mode?: 'preview' | 'editing'} & React.HTMLAttributes<HTMLElement>>> = ({id, listIndex, config, childrenIds, draggable, droppable, children, mode, ...props}) => {
   const displayMode = mode || 'preview';
   const dispatch = useDispatch();
+  const isDragOver = useIsDragOver(id);
   const isTextEditing = useIsTextEditing(id);
   const [editContent, setEditContent] = useState(config.attributes.textcontent) || '';
   const isSelected = useSelector((state: RootState) => state.canvas.selectedIds[id]);
@@ -219,9 +226,19 @@ export const DynamicComponent: React.FC<PropsWithChildren<{id: string, listIndex
           return <WrappedComponent id={id} {...convertedHandlers} {...attributes} {...props}/>;
         }
 
+        const classNameAdjuster = (isSelected: boolean, isDragOver: boolean) => {
+          if (isSelected) {
+            return `${attributes.className || ''} shadow-xl outline outline-2 outline-offset-2 outline-blue-500 transform scale-103`
+          } else if (isDragOver) {
+            return `${attributes.className || ''} outline outline-2 outline-offset-2 outline-slate-500 transform scale-103`
+          } else {
+            return attributes.className;
+          }
+        }
+
         const atts = {
           ...attributes,
-          className: isSelected ? `${attributes.className || ''} shadow-xl outline outline-2 outline-offset-2 outline-blue-500 transform scale-103` : attributes.className
+          className: classNameAdjuster(isSelected, isDragOver)
         }
 
         const setEditingHandler = (editing: boolean) => {

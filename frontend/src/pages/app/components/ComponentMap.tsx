@@ -2,9 +2,11 @@ import React, { useState, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from 'src/redux/store';
 import { setSelectedIds } from 'src/redux/slice/canvasSlice';
+import { useDragAndDropContext } from './DragAndDropContext';
 
 const ComponentList: React.FC = () => {
   const [contractedIds, setContractedIds] = useState<string[]>([]);
+  const overId = useDragAndDropContext().overComponentId;
   const childrenMap = useSelector((state: RootState) => state.canvas.componentState.present.childrenMap);
   const selectedIds = useSelector((state: RootState) => Object.keys(state.canvas.selectedIds).filter(id => state.canvas.selectedIds[id]));
   const configMap = useSelector((state: RootState) => state.canvas.componentState.present.configMap);
@@ -43,14 +45,14 @@ const ComponentList: React.FC = () => {
 
     return (
       <div key={id} className="flex flex-col w-full">
-        <div style={{...indentStyle, cursor: 'pointer', userSelect: 'none'}} className={`flex gap-1 border-b border-gray-300 w-full ${selectedIds.includes(id) ? 'bg-blue-100' : ''}`} onClick={(event) => handleSelect(id, event)} >
+        <div style={{...indentStyle, cursor: 'pointer', userSelect: 'none'}} className={`flex gap-1 border-b border-gray-300 w-full ${selectedIds.includes(id) ? 'bg-blue-100' : ''} ${overId === id ? 'bg-slate-200' : ''}`} onClick={(event) => handleSelect(id, event)} >
           {hasChildren && <button className={"w-4 h-4"} onClick={() => hasChildren && toggleContract(id)}>{isContracted ? '▶' : '▼'}</button>}
           <span style={{ userSelect: 'none' }} className={'w-full'}>{componentType.charAt(0).toUpperCase() + componentType.slice(1)}</span>
         </div>
         {!isContracted && children.map((childId: string) => <ComponentRenderer key={childId} id={childId} level={level + 1} />)}
       </div>
     );
-  }, [childrenMap, contractedIds, configMap, selectedIds, toggleContract, handleSelect]);
+  }, [childrenMap, contractedIds, configMap, selectedIds, overId, handleSelect, toggleContract]);
 
   return (
     <div className="flex h-full w-full gap-2 p-2">

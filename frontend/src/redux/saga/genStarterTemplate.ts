@@ -1,12 +1,14 @@
 import { call, put, select, takeLatest } from 'redux-saga/effects';
 import { genStarterTemplate, setNewConfigTree } from '../slice/canvasSlice';
 import { startProjectTemplateLoading, stopProjectTemplateLoading } from '../slice/loadingSlice';
-import { getCanvasState } from '../selector';
+import { getProjectDescription } from '../selector';
 import * as api from 'src/api';
 
 function* handleGenStarterTemplate() {
   try {
-    const { projectDescription } = yield select(getCanvasState);
+    const projectDescription: string = yield select(getProjectDescription);
+    
+    if (!projectDescription) return;
     
     yield(put(startProjectTemplateLoading())); 
     const { data: { configTree } } = yield call(api.genStarterTemplate, projectDescription);

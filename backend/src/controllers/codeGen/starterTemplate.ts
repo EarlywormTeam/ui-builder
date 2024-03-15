@@ -3,8 +3,9 @@ import * as LLM from '../../services/llm';
 
 export const genStarterTemplate = async (ctx: Context) => {
   const { projectDescription } = ctx.request.body as {projectDescription: string};
+  console.log('project description: ', projectDescription);
   const messages: LLM.LlmMessage[] = [{role: "system", content: magicPaintSystemPrompt}, {role: "user", content: "An up down counter application."}, {role: "assistant", content: JSON.stringify(upDownCounterSample)}, {role: "user", content: "A form with required name and email fields. Email must be valid (contain an '@' character). There's a submit button."}, {role: "assistant", content: JSON.stringify(nameAndEmailFormSample)}, {role: "user", content: 'A todo list app'}, {role: 'assistant', content: JSON.stringify(todoListSample)}, {role: "user", content: projectDescription}];
-  const resMessage = await LLM.queryLlmWithJsonValidation(messages, (json) => true, 'gpt-4-0125-preview');
+  const resMessage = await LLM.queryLlmWithJsonValidation('claude', messages, (json) => true, 'claude-3-opus-20240229', 1);
   console.log(JSON.stringify(JSON.parse(resMessage.content), null, 2));
   ctx.body = {configTree: JSON.parse(resMessage.content)};
 }
@@ -49,8 +50,6 @@ There are 2 types of configs you will deal with. Your configs must conform to on
 Always create new ids for new nodes. Do NOT reuse ids. For example, if you are adding a provider, do not reuse the id of a div or any other component. Generate a new id for the provider.
 
 Event actions must have an actionName and a contextId. The actionName must be the name of an action that is available on a context with an id that matches the contextId.
-
-Sometimes no work is required and in that case you may return an empty string to signify no work is necessary.
 
 \`\`\`tsx
 // Use functions for string interpolation or running functions.
@@ -164,107 +163,114 @@ const buttonVariants = cva(
 \`\`\`
 // This is the default style for the \`input\` type in the config tree.
 "flex h-9 w-full rounded-md border border-slate-200 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:placeholder:text-slate-400 dark:focus-visible:ring-slate-300"
-\`\`\``
+\`\`\`
+
+Reply using json. You MUST NOT return an empty string. Start your response with {`;
 
 const upDownCounterSample = {
-  "id": "root",
-  "config": {
-    "type": "div",
-    "attributes": {"className": "flex justify-center items-center h-full bg-gray-100"},
-    "events": [],
-  },
+  "id": "canvas",
   "children": [
     {
-      "id": "1",
+      "id": "root",
       "config": {
-        "name": "Counter",
-        "actions": [
-          {
-            "name": "increment",
-            "reducerCode": "return { ...state, count: state.count + 1 };"
-          },
-          {
-            "name": "decrement",
-            "reducerCode": "return { ...state, count: state.count - 1 };"
-          }
-        ],
-        "initialState": {
-          "count": 0
-        }
+        "type": "div",
+        "attributes": {"className": "flex justify-center items-center h-full bg-gray-100"},
+        "events": [],
       },
       "children": [
         {
-          "id": "2",
+          "id": "1",
           "config": {
-            "type": "button",
-            "attributes": {"textcontent": "+", "variant": "default", "size": "sm"},
-            "events": [
+            "name": "Counter",
+            "actions": [
               {
-                "name": "onClick",
-                "actions": [
-                  {
-                    "actionName": "increment",
-                    "actionPayload": null,
-                    "contextId": "1"
-                  }
-                ]
+                "name": "increment",
+                "reducerCode": "return { ...state, count: state.count + 1 };"
+              },
+              {
+                "name": "decrement",
+                "reducerCode": "return { ...state, count: state.count - 1 };"
               }
             ],
-          },
-          "children": []
-        },
-        {
-          "id": "3",
-          "config": {
-            "type": "div",
-            "attributes": {
-              "className": "flex justify-center items-center p-4"
-            },
-            "events": []
+            "initialState": {
+              "count": 0
+            }
           },
           "children": [
             {
-              "id": "4",
+              "id": "2",
               "config": {
-                "type": "label",
-                "attributes": {
-                  "textcontent": 
+                "type": "button",
+                "attributes": {"textcontent": "+", "variant": "default", "size": "sm"},
+                "events": [
                   {
-                    'args': [{
-                      "contextId": "1",
-                      "selector": ['count'],
-                      "modifier": null,
-                    }],
-                    'body': 'return args[0].toString();'
-                  },
-                  "className": "text-4xl"
-                },
-                "events": [],
+                    "name": "onClick",
+                    "actions": [
+                      {
+                        "actionName": "increment",
+                        "actionPayload": null,
+                        "contextId": "1"
+                      }
+                    ]
+                  }
+                ],
               },
               "children": []
-            }
-          ]
-        },
-        {
-          "id": "5",
-          "config": {
-            "type": "button",
-            "attributes": {"textcontent": "-", "variant": "destructive", "size": "sm"},
-            "events": [
-              {
-                "name": "onClick",
-                "actions": [
+            },
+            {
+              "id": "3",
+              "config": {
+                "type": "div",
+                "attributes": {
+                  "className": "flex justify-center items-center p-4"
+                },
+                "events": []
+              },
+              "children": [
+                {
+                  "id": "4",
+                  "config": {
+                    "type": "label",
+                    "attributes": {
+                      "textcontent": 
+                      {
+                        'args': [{
+                          "contextId": "1",
+                          "selector": ['count'],
+                          "modifier": null,
+                        }],
+                        'body': 'return args[0].toString();'
+                      },
+                      "className": "text-4xl"
+                    },
+                    "events": [],
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "5",
+              "config": {
+                "type": "button",
+                "attributes": {"textcontent": "-", "variant": "destructive", "size": "sm"},
+                "events": [
                   {
-                    "actionName": "decrement",
-                    "actionPayload": null,
-                    "contextId": "1"
+                    "name": "onClick",
+                    "actions": [
+                      {
+                        "actionName": "decrement",
+                        "actionPayload": null,
+                        "contextId": "1"
+                      }
+                    ]
                   }
-                ]
-              }
-            ],
-          },
-          "children": []
-        } 
+                ],
+              },
+              "children": []
+            } 
+          ]
+        }
       ]
     }
   ]

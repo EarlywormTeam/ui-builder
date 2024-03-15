@@ -2,6 +2,8 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { contextMap } from '../slice/canvasSlice';
 
+export const getProjectDescription = (state: RootState) => state.canvas.projectDescription;
+
 export const getCanvasState = (state: RootState) => state.canvas.componentState.present;
 
 export const useDynamicContexts = (ids: string[]) => {

@@ -4,6 +4,7 @@ import DragAndDrop from './DragAndDrop';
 import AppInternal from './AppInternal';
 import { RootState } from 'src/redux/store';
 import ProjectStartModal from './components/ProjectStartModal';
+import { DragAndDropProvider } from './components/DragAndDropContext';
 
 const App = () => {
   const [isPreview, setIsPreview] = useState(false);
@@ -21,9 +22,11 @@ const App = () => {
       {isPreview ? (
          <AppInternal isPreview={isPreview} setIsPreview={setIsPreview} />
       ) : (
-        <DragAndDrop>
-          <AppInternal isPreview={isPreview} setIsPreview={setIsPreview} />
-        </DragAndDrop>
+        <DragAndDropProvider>
+          <DragAndDrop>
+            <AppInternal isPreview={isPreview} setIsPreview={setIsPreview} />
+          </DragAndDrop>
+        </DragAndDropProvider>
       )}
       </div>
     </>
