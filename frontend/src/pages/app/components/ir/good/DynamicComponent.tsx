@@ -115,8 +115,8 @@ const convertEventHandlers = (
 };
 
 const useIsDragOver = (id: string): boolean => {
-  const dndContext = useDragAndDropContext();
-  return dndContext.overComponentId === id;
+  const overComponents = useDragAndDropContext().overComponents;
+  return overComponents.get(id) || false;
 }
 
 export const DynamicComponent: React.FC<PropsWithChildren<{id: string, listIndex: string | undefined, config: ComponentConfig, childrenIds: string[], draggable: boolean, droppable: boolean, mode?: 'preview' | 'editing'} & React.HTMLAttributes<HTMLElement>>> = ({id, listIndex, config, childrenIds, draggable, droppable, children, mode, ...props}) => {

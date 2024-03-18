@@ -7,9 +7,10 @@ import { DynamicElement  } from './components/ir/good/DynamicElement';
 import { ComponentConfig, ProviderConfig, ListConfig } from './components/ir/good/config';
 // import App from './AppInternal';
 import { useDragAndDropContext } from './components/DragAndDropContext';
+import { ComponentMapRow } from './components/ComponentMap';
 
 const calculateOverIdAndIndex = (event: DragMoveEvent | DragEndEvent, configMap: { [key: string]: ComponentConfig | ProviderConfig | ListConfig }, childrenMap: { [key: string]: string[] }) => {
-  const { active, over, collisions } = event;
+  const { active, collisions } = event;
 
   let overId = null;
   let index = null;
@@ -19,10 +20,23 @@ const calculateOverIdAndIndex = (event: DragMoveEvent | DragEndEvent, configMap:
     pointerLocation = {x: event.activatorEvent.x + event.delta.x, y: event.activatorEvent.y + event.delta.y}
     console.log('pointer location', pointerLocation);
   }
-  if (!collisions || !collisions.length) { return {overId, index}; }
+  if (!collisions || !collisions.filter(c => c !== undefined).length) { return {overId, index}; }
   // calculate inner drop area of top collision as maximum of 65% width and height, centered and 45.
   const dropRect = collisions[0].data?.droppableContainer.rect.current;
   if (!dropRect) { return {overId, index}; }
+
+  if (collisions[0].id.toString().startsWith('map-')) {
+    let ci = 0;
+      while (true) {
+        if (ci >= collisions.length) { break; }
+        if (collisions[ci].id.toString() !== active.id) {
+          overId = collisions[ci].id.toString();
+          break;
+        }
+        ci += 1;
+      }
+      return {overId, index: 0};
+  }
 
   // figure out the type of container
   let containerType = '';
@@ -100,22 +114,33 @@ const DragAndDrop = ({ children }: { children: React.ReactNode }) => {
   const dndContext = useDragAndDropContext();
 
   const onDragStart = (event: { active: { id: string; children?: React.ReactNode[] } }) => {
+    if (event.active.id.toString().endsWith('canvas')) { return; }
     setActiveId(event.active.id);
   }
 
   const onDragMove = (event: DragMoveEvent) => {
+    if (event.active.id.toString().endsWith('canvas')) { return; }
     const { overId } = calculateOverIdAndIndex(event, configMap, childrenMap);
     dndContext.setOverComponentId(overId?.toString() || null);
   }
 
   const onDragEnd = (event: DragEndEvent) => {
     const { active } = event;
+    if (active.id.toString().endsWith('canvas')) { return; }
+
     const {overId, index} = calculateOverIdAndIndex(event, configMap, childrenMap);
 
     if (!overId) { return }
 
     const activeIdString = active.id.toString();
     let newId = activeIdString;
+    if (newId.startsWith('map-')) {
+      newId = newId.replace('map-', '');
+    }
+    let cleanedOverId = overId.toString();
+    if (cleanedOverId.startsWith('map-')) {
+      cleanedOverId = cleanedOverId.replace('map-', '');
+    }
     if (activeIdString.includes('__demo')) {
       const adjustedId = activeIdString.replace('__demo', '');
       const newConfig = demoConfigMap[adjustedId];
@@ -132,7 +157,7 @@ const DragAndDrop = ({ children }: { children: React.ReactNode }) => {
       //   const middleIndex = collisionIndexes[0] + 1;
       //   dispatch(insertChild({id: newId, parentId: over.id.toString(), index: middleIndex}));
       // } else {
-    dispatch(insertChild({id: newId, parentId: overId.toString(), index: index}));
+    dispatch(insertChild({id: newId, parentId: cleanedOverId, index: index}));
     setActiveId(null);
     dndContext.setOverComponentId(null);
   };
@@ -147,17 +172,19 @@ const DragAndDrop = ({ children }: { children: React.ReactNode }) => {
   );
 
   return (
-      <DndContext collisionDetection={pointerWithin} onDragMove={(event) => onDragMove(event as any)} onDragStart={(event) => onDragStart(event as any)} onDragEnd={(event) => onDragEnd(event as any)} sensors={sensors}>
-        {children}
-        <DragOverlay dropAnimation={{
-              duration: 400,
-              easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
-            }}>
-              {activeId ? (
-                <DynamicElement id={activeId} listIndex={undefined} key={undefined} draggable={false} droppable={false} mode="preview" />
-              ) : null}
-            </DragOverlay> 
-      </DndContext>
+    <DndContext collisionDetection={pointerWithin} onDragMove={(event) => onDragMove(event as any)} onDragStart={(event) => onDragStart(event as any)} onDragEnd={(event) => onDragEnd(event as any)} sensors={sensors}>
+      {children}
+      <DragOverlay dropAnimation={{
+        duration: 400,
+        easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
+      }}>
+        {activeId && (!activeId.startsWith('map-') ? (
+          <DynamicElement id={activeId} listIndex={undefined} key={undefined} draggable={false} droppable={false} mode="preview" />
+        ) : (
+          <ComponentMapRow id={activeId} level={1} hasChildren={false} isContracted={false} configMap={configMap} toggleContract={() => {}} />
+        ))}
+      </DragOverlay>
+    </DndContext>
   );
 };
 

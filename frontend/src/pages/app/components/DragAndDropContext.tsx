@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState } from 'react';
 
 interface DragAndDropContextType {
-  overComponentId: string | null;
+  overComponents: Map<string, boolean>;
   setOverComponentId: (id: string | null) => void;
 }
 
@@ -16,10 +16,28 @@ export const useDragAndDropContext = () => {
 };
 
 export const DragAndDropProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
-  const [overComponentId, setOverComponentId] = useState<string | null>(null);
+  const [overComponents, setOverComponents] = useState<Map<string, boolean>>(new Map());
+
+  const setOverComponentId = (id: string | null) => {
+    setOverComponents(prev => {
+      const updated = new Map();
+      if (id) {
+        updated.set(id, true);
+        prev.forEach((value, key) => {
+          if (key !== id) updated.set(key, false);
+        });
+      } else {
+        prev.forEach((value, key) => {
+          updated.set(key, false);
+        });
+      }
+      
+      return updated;
+    });
+  };
 
   return (
-    <DragAndDropContext.Provider value={{ overComponentId, setOverComponentId }}>
+    <DragAndDropContext.Provider value={{ overComponents, setOverComponentId }}>
       {children}
     </DragAndDropContext.Provider>
   );
