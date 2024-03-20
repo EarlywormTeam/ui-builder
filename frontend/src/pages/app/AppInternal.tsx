@@ -9,6 +9,7 @@ import Toolbar from './components/Toolbar';
 import { setSelectedIds } from 'src/redux/slice/canvasSlice';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from 'src/components/ui/resizable';
 import PropertyEditor from './components/PropertyEditor';
+import ComponentCodeEditor from './components/ComponentCodeEditor';
 
 const useIsTextEditing = () => {
   const textEditingId = useSelector((state: RootState) => state.canvas.textEditingId);
@@ -58,7 +59,7 @@ const AppInternal = ({isPreview, setIsPreview}: {isPreview: boolean, setIsPrevie
             </ResizablePanel>
             <ResizableHandle/>
             <ResizablePanel className="flex h-full w-full" minSize={15} maxSize={98} defaultSize={30} collapsedSize={2} collapsible={true}>
-              <PropertyEditor />
+              <ComponentCodeEditor />
             </ResizablePanel>
           </ResizablePanelGroup>
         </ResizablePanel>

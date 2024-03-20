@@ -5,6 +5,8 @@ import './index.css';
 import { Provider } from 'react-redux';
 import store from './redux/store';
 import App from './pages/app/App1';
+import 'core-js/stable';
+import 'regenerator-runtime/runtime';
 import reportWebVitals from './reportWebVitals';
 
 const rootElement = document.getElementById('root');
